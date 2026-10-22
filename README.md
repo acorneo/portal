@@ -8,6 +8,32 @@
 **Game Mode:** Single-player, cross-device experience  
 **Working Title:** PORTAL
 
+### Run the first desktop maze
+
+With a JDK installed, launch the native Compose application from the repository root:
+
+```sh
+./gradlew :desktopApp:run
+```
+
+Move with **WASD or arrow keys**. Click the maze to restore keyboard focus.
+Switching windows pauses the simulation and clears held keys; press a direction
+again after returning. The entire handmade maze is visible in this milestone.
+
+```sh
+./gradlew :shared:jvmTest :desktopApp:test :desktopApp:compileKotlin
+```
+
+World models, the handmade map, movement, swept circle-wall collision, and the
+120 Hz fixed-step clock live in `shared/src/commonMain/.../world`, without
+Compose or platform input dependencies. World distances are measured in tiles;
+movement is 3 tiles per second, with normalized diagonal input. Catch-up is
+limited to 8 ticks per frame and excess stalled time is discarded. Continuous
+collision checks wall faces and rounded corners, then slides along contact
+surfaces. `App.kt` renders state using Compose Canvas; only `desktopApp` owns
+keyboard events, window focus, and the frame loop. The iOS entry point remains
+compatible and displays the shared maze without desktop controls.
+
 ---
 
 ## 01. The Vision — A World Beyond the Screen
