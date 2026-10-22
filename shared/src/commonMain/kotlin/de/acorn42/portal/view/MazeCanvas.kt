@@ -17,6 +17,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.acorn42.portal.world.*
+import de.acorn42.portal.portal.PortalLevel
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.floor
 
 private val Floor = Color(0xFF132638)
 private val ExploredFloor = Color(0xFF0E1825)
@@ -30,7 +33,7 @@ private data class CellGeometry(val cell: Cell, val walls: List<Wall>)
 
 /** Camera and light effects are presentation state. Exploration is read-only here. */
 @Composable
-internal fun MazeCanvas(maze: Maze, sphere: Sphere, visibility: VisibilityState, active: Boolean, modifier: Modifier) {
+internal fun MazeCanvas(maze: Maze, sphere: Sphere, visibility: VisibilityState, active: Boolean, modifier: Modifier, sphereVisible: Boolean = true, portals: Boolean = false, gateUnlocked: Boolean = false) {
     val pixelsPerTile = with(LocalDensity.current) { 64.dp.toPx().toDouble() }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val viewport = if (canvasSize.width > 0 && canvasSize.height > 0) {
@@ -112,9 +115,29 @@ internal fun MazeCanvas(maze: Maze, sphere: Sphere, visibility: VisibilityState,
                 }
             }
 
+            if (portals) {
+                for ((point, tint) in listOf(PortalLevel.entrance to Color(0xFFBD91FF), PortalLevel.exit to Turquoise)) {
+                    val known = visibility.at(Cell(floor(point.x).toInt(), floor(point.y).toInt()))
+                    if (known == Visibility.Unexplored) continue
+                    val alpha = if (known == Visibility.Visible) 1f else 0.22f
+                    val center = screen(point)
+                    drawCircle(tint.copy(alpha = alpha), scale * 0.37f, center, style = Stroke(scale * 0.055f))
+                    drawCircle(tint.copy(alpha = alpha * 0.12f), scale * 0.29f, center)
+                }
+                if (!gateUnlocked) {
+                    val gate = PortalLevel.gate
+                    val cell = Cell(gate.left.toInt(), gate.top.toInt())
+                    val known = visibility.at(cell)
+                    if (known != Visibility.Unexplored) {
+                        val alpha = if (known == Visibility.Visible) 1f else 0.22f
+                        drawLine(Color(0xFFFFB46B).copy(alpha = alpha), screen(Vec2(gate.left, gate.top + 0.5)), screen(Vec2(gate.right, gate.top + 0.5)), scale * 0.1f)
+                    }
+                }
+            }
+
             // The sphere is our only dynamic entity. Future entities must use
             // this exact visibility gate, never the explored-geometry memory.
-            if (visibility.isVisible(sphere.position)) {
+            if (sphereVisible && visibility.isVisible(sphere.position)) {
                 val center = screen(sphere.position)
                 val radius = sphere.radius.toFloat() * scale
                 clipPath(visibleArea) {

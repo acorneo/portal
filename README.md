@@ -50,7 +50,85 @@ for stationary or linearly moving targets. `view/MazeCanvas.kt` renders supplied
 world and visibility state at 64 dp per tile, with a soft radial light edge and
 modest sphere glow. Camera motion follows display frames; only `desktopApp`
 owns keyboard events, window focus, and simulation frame timing. The iOS entry
-point remains compatible and displays the shared scene without desktop controls.
+point displays the dedicated phone puzzle, with offline and paired modes.
+
+
+### Play the first cross-device portal
+
+This local prototype supports one Mac and one iPhone on the **same trusted Wi-Fi**.
+Keep both apps foreground; it does not wake or switch apps. Use a private IPv4
+address (`10.x.x.x`, `172.16–31.x.x`, or `192.168.x.x`), not a guest network with
+client isolation. Session progress and pairing credentials exist only in memory;
+keep both processes running during recovery tests. Restart both to begin a new
+session or replace the paired phone.
+
+1. Run `./gradlew :desktopApp:run` from this checkout. Click **Start phone session**.
+   The session bar shows the Mac address, port `8765`, and a six-digit code valid
+   for five minutes. **New code** refreshes it before pairing. Allow incoming
+   connections/local-network access if macOS asks. Do not open the port to the internet.
+2. Open `iosApp/iosApp.xcodeproj` in Xcode, select scheme **iosApp**, choose your
+   physical iPhone, configure your signing team if necessary, and Run. The existing
+   **offline test room** remains the initial screen. Tap **Pair with Mac**, enter
+   one displayed Mac Wi-Fi address followed by `:8765` and the code, then **Pair**.
+   Allow **Local Network** access. If denied, enable PORTAL in Settings > Privacy
+   & Security > Local Network, then retry. No Bonjour discovery is used.
+3. Keep the Mac game window focused. Move right from the start with **D / Right**
+   to the violet ring at `(4.5, 1.5)`. The Mac sphere disappears while the phone
+   prepares and acknowledges the room. Only the active device can move it.
+4. Hold the phone fairly flat and tap **Calibrate**. Tilt gently through the existing
+   pocket room: pass the first barrier on its right, the second on its left, then
+   reach the violet exit near the bottom right. Touch fallback remains available.
+   The completed room is acknowledged, the sphere returns to `(5.5, 3.5)` on the Mac,
+   and the orange gate above it opens. Explore through it; fog memory is retained.
+5. To test recovery, briefly turn off phone Wi-Fi or background either app during
+   phone play or a transition. Gameplay pauses once the connection/foreground loss
+   is detected (network failure detection takes several seconds). Restore Wi-Fi and
+   foreground both apps. The phone reconnects automatically or offers **Reconnect**;
+   recalibrate after resuming. Latest local progress, transfer identity and one-time
+   unlock survive reconnect; an acknowledged completion cannot duplicate the sphere.
+   **Offline mode** disconnects without abandoning the retained paired session.
+
+Native desktop launch does not use a web preview. Simulator runs can use
+`127.0.0.1:8765` with touch fallback, but cannot verify Core Motion, physical haptics,
+or Apple's local-network permission prompt. Physical two-device playtesting is
+required for those behaviors and real Wi-Fi/firewall conditions.
+
+The wire protocol is JSON over Ktor 3.6 WebSockets at `/portal/v1`, version `1`,
+with 16 KiB packet/frame limits. The Mac serializes session state, emits revisioned
+snapshots, assigns unique outbound/return IDs, and waits for acknowledgements before
+changing ownership. Reconnecting rotates the connection generation, invalidating old
+inputs and disconnect callbacks. Phone checkpoints carry increasing sequences and
+stay in the client outbox until acknowledged; duplicate/stale events cannot reapply
+return/unlock. A short-lived code pairs one phone; a random resume token restores it.
+
+This is a cooperative LAN demo using plaintext `ws://`, **not an authenticated,
+encrypted transport against a hostile network**. A network observer can read pairing
+and resume credentials. The Mac validates session, generation, transfer, room,
+sequence, finite values, speed, collision clearance and completion-at-exit. It trusts
+the phone's local trajectory for responsive tilt; it does not replay inputs to prove
+a puzzle was solved fairly. Clients cannot choose the desktop exit or unlock value.
+Disk persistence, anti-cheat and TLS provisioning are outside this milestone.
+
+Apple configuration scopes insecure HTTP exceptions to private IPv4 ranges and
+loopback (supported by the project's iOS 18.2 minimum), alongside
+`NSLocalNetworkUsageDescription` and `NSAllowsLocalNetworking`. No global ATS bypass,
+Bonjour service declaration or multicast entitlement is added. See Apple's
+[IP address exception guidance](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsexceptiondomains)
+and [local-network privacy guidance](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
+Networking follows the official Ktor
+[server WebSockets](https://ktor.io/docs/server-websockets.html) and
+[client WebSockets](https://ktor.io/docs/client-websockets.html) APIs; iOS uses the
+[Darwin engine](https://ktor.io/docs/client-engines.html#darwin).
+
+Combined checks:
+
+```sh
+./gradlew :shared:jvmTest :desktopApp:test :desktopApp:compileKotlin :shared:compileKotlinIosSimulatorArm64
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
+  -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \
+  -configuration Debug -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /tmp/portal-ios-derived CODE_SIGNING_ALLOWED=NO build
+```
 
 ---
 

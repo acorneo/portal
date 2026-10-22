@@ -37,13 +37,19 @@ class VisibilityState internal constructor(
 }
 
 /** Session memory advances from world positions, independently of camera and rendering. */
-class Exploration(val maze: Maze, initialObserver: Vec2 = maze.start, val radius: Double = 4.5) {
+class Exploration(
+    val maze: Maze,
+    initialObserver: Vec2 = maze.start,
+    val radius: Double = 4.5,
+    initialExplored: Set<Cell> = emptySet(),
+) {
     var state: VisibilityState
         private set
 
     init {
         require(radius.isFinite() && radius > 0)
-        state = calculate(initialObserver, emptySet())
+        require(initialExplored.all { it.x in 0 until maze.width && it.y in 0 until maze.height })
+        state = calculate(initialObserver, initialExplored)
     }
 
     fun update(observer: Vec2) {

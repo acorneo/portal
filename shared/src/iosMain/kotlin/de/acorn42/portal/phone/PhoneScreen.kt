@@ -27,8 +27,19 @@ private val Mint = Color(0xFF6FFFE2)
 private val Muted = Color(0xFF9AAEC4)
 
 @Composable
-fun PhoneScreen() {
+fun PhoneScreen(onPair: (() -> Unit)? = null) {
     val host = rememberPhoneHost()
+    PhonePuzzleScreen(host, "OFFLINE", onLeave = onPair, leaveText = "Pair with Mac")
+}
+
+@Composable
+internal fun PhonePuzzleScreen(
+    host: PhoneHost,
+    label: String,
+    onLeave: (() -> Unit)? = null,
+    leaveText: String = "Disconnect",
+    connectionMessage: String? = null,
+) {
     MaterialTheme(colorScheme = darkColorScheme(background = Ink, primary = Mint)) {
         Column(Modifier.fillMaxSize().background(Ink).safeContentPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -36,15 +47,19 @@ fun PhoneScreen() {
                     Text("P O R T A L", color = Mint, fontSize = 24.sp, fontWeight = FontWeight.Light)
                     Text("01 / THE POCKET ROOM", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
                 }
-                Text("OFFLINE", color = Muted, fontSize = 10.sp)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(label, color = Muted, fontSize = 10.sp)
+                    if (onLeave != null) TextButton(onClick = onLeave) { Text(leaveText, fontSize = 11.sp) }
+                }
             }
             Spacer(Modifier.height(12.dp))
             RoomCanvas(host.state, Modifier.fillMaxWidth().weight(1f))
             Spacer(Modifier.height(12.dp))
             Text(if (host.state.completed) "EXIT REACHED" else if (!host.active) "PAUSED" else if (host.ready) "ROLL TO THE VIOLET EXIT" else "SET YOUR NEUTRAL", color = Mint, fontSize = 12.sp)
             Text(host.message, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            if (connectionMessage != null) Text(connectionMessage, color = Muted, fontSize = 11.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = host::reset, enabled = host.active) { Text("Reset room") }
+                Button(onClick = host::reset, enabled = host.active && (label == "OFFLINE" || !host.state.completed)) { Text("Reset room") }
                 if (!host.touchMode) OutlinedButton(onClick = host::calibrate, enabled = host.active && host.hasSample && !host.state.completed) { Text("Calibrate") }
             }
             if (host.touchMode) {

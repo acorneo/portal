@@ -65,6 +65,14 @@ class PhonePuzzle(
     fun reset() { state = PhoneState(initial) }
     fun stop() { state = state.copy(velocity = Vec2.Zero) }
 
+    /** Restore a validated in-memory session checkpoint; offline reset is unchanged. */
+    fun restore(checkpoint: PhoneState) {
+        require(maze.canOccupy(checkpoint.sphere) && checkpoint.sphere.radius == initial.radius)
+        require(checkpoint.velocity.x.isFinite() && checkpoint.velocity.y.isFinite() && checkpoint.velocity.length <= 4.000001)
+        require(!checkpoint.completed || (checkpoint.sphere.position - exit).length <= PhoneRoom.exitRadius)
+        state = checkpoint
+    }
+
     fun step(input: Vec2, seconds: Double): PhoneEvents {
         require(seconds.isFinite() && seconds > 0 && seconds <= 1.0 / 30.0)
         if (state.completed) return PhoneEvents()

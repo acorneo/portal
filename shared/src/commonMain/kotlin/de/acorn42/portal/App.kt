@@ -40,6 +40,9 @@ fun App(
     modifier: Modifier = Modifier,
     controls: String = "PORTAL · Shared world",
     active: Boolean = true,
+    sphereVisible: Boolean = true,
+    portals: Boolean = false,
+    gateUnlocked: Boolean = false,
 ) {
     MaterialTheme(colorScheme = darkColorScheme(background = Background, primary = Turquoise)) {
         Column(modifier.fillMaxSize().background(Background).safeContentPadding().padding(24.dp)) {
@@ -52,7 +55,7 @@ fun App(
                 Text(if (active) "EXPLORE" else "PAUSED", color = if (active) Turquoise else Muted, fontSize = 11.sp)
             }
             Spacer(Modifier.height(20.dp))
-            MazeCanvas(maze, sphere, visibility, active, Modifier.fillMaxWidth().weight(1f))
+            MazeCanvas(maze, sphere, visibility, active, Modifier.fillMaxWidth().weight(1f), sphereVisible, portals, gateUnlocked)
             Spacer(Modifier.height(18.dp))
             Text("Lit · visible    Faint · explored    Dark · unknown", color = Muted, fontSize = 11.sp)
             Spacer(Modifier.height(6.dp))

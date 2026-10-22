@@ -3,7 +3,37 @@
 <plist version="1.0">
     <dict>
         <key>NSMotionUsageDescription</key>
-        <string>PORTAL uses your phone’s tilt to roll the sphere in an offline puzzle room.</string>
+        <string>PORTAL uses your phone’s tilt to roll the sphere in its pocket puzzle room.</string>
+        <key>NSLocalNetworkUsageDescription</key>
+        <string>PORTAL connects to your Mac on the same Wi-Fi to transfer the sphere between screens.</string>
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsLocalNetworking</key>
+            <true/>
+            <key>NSExceptionDomains</key>
+            <dict>
+                <key>10.0.0.0/8</key>
+                <dict>
+                    <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                    <true/>
+                </dict>
+                <key>172.16.0.0/12</key>
+                <dict>
+                    <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                    <true/>
+                </dict>
+                <key>192.168.0.0/16</key>
+                <dict>
+                    <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                    <true/>
+                </dict>
+                <key>127.0.0.1</key>
+                <dict>
+                    <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                    <true/>
+                </dict>
+            </dict>
+        </dict>
         <key>CADisableMinimumFrameDurationOnPhone</key>
         <true/>
     </dict>
