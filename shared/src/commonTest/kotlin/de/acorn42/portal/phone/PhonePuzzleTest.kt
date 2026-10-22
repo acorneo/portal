@@ -11,11 +11,34 @@ class PhonePuzzleTest {
         assertEquals(0.2, tilt.input(Vec2(0.3, -0.3)).x, 1e-10)
         assertEquals(0.4, tilt.input(Vec2(0.5, -0.3)).x, 1e-10)
         assertEquals(Vec2.Zero, tilt.input(Vec2(Double.NaN, 0.0)))
-        assertFalse(tilt.calibrate(Vec2(2.0, 0.0)))
         assertEquals(Vec2.Zero, tilt.input(Vec2(0.11, -0.3)))
         assertEquals(0.75, tilt.input(Vec2(1.0, 1.0)).length, 1e-10)
-        tilt.clear()
+        assertFalse(tilt.calibrate(Vec2(2.0, 0.0)))
         assertFalse(tilt.calibrated)
+    }
+
+    @Test fun uprightAndNearUprightCalibrationRejectsAndClearsPreviousNeutral() {
+        val tilt = TiltCalibration()
+        for (pose in listOf(Vec2(0.0, 1.0), Vec2(0.0, 0.98), Vec2(0.0, -0.98), Vec2(0.98, 0.0), Vec2(0.5, 0.5))) {
+            assertTrue(tilt.calibrate(Vec2.Zero))
+            assertFalse(tilt.calibrate(pose), "Unsuitable pose accepted: $pose")
+            assertFalse(tilt.calibrated)
+            assertEquals(Vec2.Zero, tilt.input(Vec2(0.2, 0.2)))
+        }
+    }
+
+    @Test fun acceptedNeutralRetainsMovementRangeInEveryDirection() {
+        val tilt = TiltCalibration()
+        for (neutral in listOf(Vec2.Zero, Vec2(0.0, 0.65), Vec2(0.0, -0.65), Vec2(0.65, 0.0), Vec2(-0.65, 0.0))) {
+            assertTrue(tilt.calibrate(neutral))
+            for (direction in listOf(Vec2(0.2, 0.0), Vec2(-0.2, 0.0), Vec2(0.0, 0.2), Vec2(0.0, -0.2))) {
+                val sample = neutral + direction
+                assertTrue(sample.length <= 1.0, "Sample must be physically attainable")
+                val input = tilt.input(sample)
+                assertEquals(direction.x, input.x, 1e-10)
+                assertEquals(direction.y, input.y, 1e-10)
+            }
+        }
     }
 
     @Test fun inertiaDampingAndMagnitude() {

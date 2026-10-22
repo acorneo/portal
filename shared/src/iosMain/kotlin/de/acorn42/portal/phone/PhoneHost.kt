@@ -36,7 +36,7 @@ internal class PhoneHost {
         private set
     var state by mutableStateOf(puzzle.state)
         private set
-    var message by mutableStateOf(if (touchMode) "Motion unavailable · use touch pad" else "Hold comfortably, then calibrate")
+    var message by mutableStateOf(if (touchMode) "Motion unavailable · use touch pad" else "Hold phone fairly flat, then calibrate")
         private set
     var hasSample by mutableStateOf(false)
         private set
@@ -116,13 +116,14 @@ internal class PhoneHost {
 
     fun calibrate() {
         val value = sample ?: return
-        if (!active || touchMode || now() - sampleAt > 0.5 || !calibration.calibrate(value)) return
+        if (!active || touchMode || now() - sampleAt > 0.5) return
         puzzle.stop()
         state = puzzle.state
         clock.reset()
-        ready = true
-        message = "Neutral set · tilt gently toward the exit"
-        selection.selectionChanged()
+        ready = calibration.calibrate(value)
+        message = if (ready) "Neutral set · tilt gently toward the exit"
+            else "Hold phone flatter, then calibrate again"
+        if (ready) selection.selectionChanged()
     }
 
     fun touch(value: Vec2) { touchInput = if (active && ready && touchMode) boundedTilt(value) else Vec2.Zero }
@@ -137,7 +138,7 @@ internal class PhoneHost {
         active = false
         if (wasActive) start()
         if (!touchMode && failed) message = "Motion unavailable · choose touch fallback"
-        else if (!touchMode) message = "Room reset · calibrate your neutral position"
+        else if (!touchMode) message = "Room reset · hold flatter and calibrate"
         else message = "Room reset · drag from the pad’s center"
     }
 

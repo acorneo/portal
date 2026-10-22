@@ -9,7 +9,12 @@ class TiltCalibration {
     val calibrated get() = neutral != null
 
     fun calibrate(gravity: Vec2): Boolean {
-        if (!gravity.valid()) return false
+        // Leave at least 0.35 g of headroom on each screen axis. An upright
+        // neutral pose would make one direction impossible with subtraction.
+        if (!gravity.valid() || gravity.length > 0.65) {
+            clear()
+            return false
+        }
         neutral = gravity
         return true
     }

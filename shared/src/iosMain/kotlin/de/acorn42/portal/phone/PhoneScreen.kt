@@ -52,7 +52,7 @@ fun PhoneScreen() {
                 TouchPad(host, Modifier.fillMaxWidth().height(100.dp).padding(top = 6.dp))
             } else {
                 TextButton(onClick = host::useTouch, enabled = host.active && !host.state.completed) { Text("Use simulator / touch fallback") }
-                Text("Portrait · hold steady and calibrate. Tilt more to accelerate more.", color = Muted, fontSize = 11.sp)
+                Text("Portrait · hold fairly flat and calibrate. Tilt more to accelerate more.", color = Muted, fontSize = 11.sp)
             }
         }
     }
