@@ -21,7 +21,7 @@ final class NearbyProtocolTests: XCTestCase {
     }
     func testOversizedMalformedAndVersionFramesAreRejected() throws {
         var framer = NearbyFramer()
-        XCTAssertThrowsError(try framer.append(Data([0, 1, 0, 0])))
+        XCTAssertThrowsError(try framer.append(Data([0, 1, 0, 1])))
         framer = NearbyFramer()
         XCTAssertThrowsError(try framer.append(Data([0, 0, 0, 1, 123])))
         var message = NearbyMessage("hello"); message.version = 9
@@ -85,6 +85,23 @@ final class NearbyProtocolTests: XCTestCase {
         _ = try freshPhone.receive(offer)
         XCTAssertThrowsError(try freshPhone.receive(oldApproval))
         XCTAssertThrowsError(try freshPhone.receive(oldPing))
+    }
+    func testGameplayRequiresConsentCapabilityAndConnectionIdentity() throws {
+        var (host, phone) = try pair()
+        XCTAssertThrowsError(try phone.game("{}"))
+        _ = try phone.receive(host.decide(accept: true))
+        let payload = "{\"kind\":\"Hello\",\"unicode\":\"🌀\"}"
+        let game = try phone.game(payload)
+        var framer = NearbyFramer()
+        let decoded = try XCTUnwrap(framer.append(NearbyFramer.encode(game)).first)
+        XCTAssertEqual(decoded.payload, payload)
+        XCTAssertTrue(try host.receive(decoded).isEmpty)
+        var stale = game; stale.echo = UUID().uuidString
+        XCTAssertThrowsError(try host.receive(stale))
+        XCTAssertThrowsError(try phone.game(String(repeating: "x", count: nearbyMaxGamePayload + 1)))
+        var oldClient = phone.hello(); oldClient.gameVersion = nil
+        var freshHost = NearbyMachine(host: true, identity: host.identity, session: host.session)
+        XCTAssertThrowsError(try freshHost.receive(oldClient))
     }
     func testNativeParametersExplicitlyEnablePeerToPeer() {
         XCTAssertTrue(NearbyNetwork.parameters().includePeerToPeer)

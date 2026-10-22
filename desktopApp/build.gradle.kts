@@ -9,7 +9,7 @@ plugins {
 dependencies {
     implementation(project(":shared"))
 
-    implementation(libs.ktor.serialization.json)
+    implementation(libs.kotlinx.serializationJson)
     implementation(libs.compose.material3)
     implementation(compose.desktop.currentOs)
     implementation(libs.kotlinx.coroutinesSwing)
@@ -35,7 +35,7 @@ compose.desktop {
                         <key>NSBonjourServices</key>
                         <array><string>_portalnear._tcp</string></array>
                         <key>NSLocalNetworkUsageDescription</key>
-                        <string>PORTAL discovers and connects to a nearby iPhone over peer-to-peer Wi-Fi for the connection POC and hosts the LAN portal demo.</string>
+                        <string>PORTAL discovers and connects to a nearby iPhone over peer-to-peer Wi-Fi to play together without a shared router.</string>
                     """.trimIndent()
                 }
             }

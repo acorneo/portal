@@ -23,10 +23,32 @@ class NearbyBridgeTest {
         assertFails { NearbyBridgeCodec.decode(status.replace("awaitingApproval", "unexpected")) }
         assertFails { NearbyBridgeCodec.decode(status.replace("\"acknowledgements\":2", "\"acknowledgements\":-1")) }
         assertFails { NearbyBridgeCodec.decode("{") }
-        assertFails { NearbyBridgeCodec.line(StringReader("x".repeat(32769))) }
+        assertFails { NearbyBridgeCodec.line(StringReader("x".repeat(65537))) }
         assertFails { NearbyBridgeCodec.line(StringReader("incomplete")) }
         assertNull(NearbyBridgeCodec.line(StringReader("")))
         assertEquals(status, NearbyBridgeCodec.line(StringReader(status + "\n")))
+    }
+    @Test fun gameplayEnvelopePreservesPayloadAndConnectionWithoutCommandInjection() {
+        val payload = "{\"kind\":\"Hello\",\"text\":\"🌀\\n\"}"
+        val command = NearbyBridgeCodec.command("game", "connection-1", payload)
+        // Construct independently: escaping payloads must preserve the exact JSON string.
+        val json = kotlinx.serialization.json.buildJsonObject {
+            put("event", kotlinx.serialization.json.JsonPrimitive("game"))
+            put("connectionID", kotlinx.serialization.json.JsonPrimitive("connection-1"))
+            put("peerID", kotlinx.serialization.json.JsonPrimitive("phone"))
+            put("payload", kotlinx.serialization.json.JsonPrimitive(payload))
+        }
+        assertEquals(NearbyBridgeEvent.Game("connection-1", "phone", payload), NearbyBridgeCodec.event(json.toString()))
+        assertEquals(1, command.count { it == '\n' })
+        assertFails { NearbyBridgeCodec.command("game", "c", "x".repeat(16385)) }
+        assertFails { NearbyBridgeCodec.event(json.toString().replace("connection-1", "")) }
+    }
+    @Test fun keyboardFocusLossKeepsPhoneSessionAvailable() {
+        assertTrue(DesktopAvailability(false, true, false).hostAvailable)
+        assertFalse(DesktopAvailability(false, true, false).keyboardAvailable)
+        assertFalse(DesktopAvailability(true, true, true).hostAvailable)
+        assertFalse(DesktopAvailability(true, false, false).hostAvailable)
+        assertFalse(DesktopAvailability(true, true, false, applicationHidden = true).hostAvailable)
     }
     @Test fun bundledNativeHelperStartsAndExitsWhenParentPipeCloses() {
         assumeTrue(System.getProperty("os.name").startsWith("Mac"))

@@ -2,243 +2,130 @@
 ### Beyond the Screen
 *One world. Multiple devices. Infinite possibilities.*
 
-**Genre:** Atmospheric Puzzle Adventure / Physics-Based Exploration  
+**Genre:** Atmospheric puzzle adventure / physics-based exploration
 **Platforms:** macOS + iOS  
-**Technologies:** Kotlin Multiplatform, Compose Multiplatform, Core Motion, Ktor, Procedural Generation, Machine Learning  
-**Game Mode:** Single-player, cross-device experience  
-**Working Title:** PORTAL
+**Current prototype:** Handmade desktop maze, camera/fog, motion-controlled phone puzzle, native nearby portal gameplay. The vision below includes future work.
 
-### Run the desktop maze
+### Run and play nearby
 
-With a JDK installed, launch the native Compose application from the repository root:
+Nearby is the only connection flow. The Mac automatically advertises; the iPhone
+lists nearby Macs. Tap one, compare the fingerprint, and explicitly accept the
+phone on the Mac. No IP, code, mode picker or ping screen is needed. Both apps
+must use this revision; older connection-only POC builds are incompatible.
 
-```sh
-./gradlew :desktopApp:run
-```
-
-Move with **WASD or arrow keys**. Click the maze to restore keyboard focus.
-Switching windows pauses the simulation and clears held keys; press a direction
-again after returning. The camera follows the sphere smoothly; resizing keeps
-the view inside the world, or centers the world when it fits in the viewport.
-
-The sphere reveals a limited area with wall occlusion. Lit geometry is visible
-now; faint geometry has been explored before; unknown areas stay concealed.
-Exploration persists until the application closes. Walk away and return to
-check that remembered corridors remain faint while hidden paths stay dark.
-Resize the window and switch away while holding a direction to check camera
-bounds and focus behavior.
-
-```sh
-./gradlew :shared:jvmTest :desktopApp:test :desktopApp:compileKotlin
-./gradlew :shared:compileKotlinIosSimulatorArm64
-```
-
-World models, the handmade map, movement, swept circle-wall collision, and the
-120 Hz fixed-step clock live in `shared/src/commonMain/kotlin/de/acorn42/portal/world`, without
-Compose or platform input dependencies. World distances are measured in tiles;
-movement is 3 tiles per second, with normalized diagonal input. Catch-up is
-limited to 8 ticks per frame and excess stalled time is discarded. Continuous
-collision checks wall faces and rounded corners, then slides along contact
-surfaces. Exploration advances with simulation steps, independently of the
-camera. Shared visibility uses circular, tile-centered sight with closed
-segment/wall intersection tests, including corner and thin-wall occlusion.
-Explored geometry is remembered; dynamic entities require an exact visible
-point within the radius and a clear sight line.
-
-`view/Camera.kt` contains pure camera bounds, transforms, and analytic smoothing
-for stationary or linearly moving targets. `view/MazeCanvas.kt` renders supplied
-world and visibility state at 64 dp per tile, with a soft radial light edge and
-modest sphere glow. Camera motion follows display frames; only `desktopApp`
-owns keyboard events, window focus, and simulation frame timing. The iOS entry
-point displays the dedicated phone puzzle, with offline and paired modes.
-
-
-### Nearby connection POC — peer-to-peer Wi-Fi
-
-This separate **Nearby POC** mode tests native Mac/iPhone discovery, explicit
-pairing consent and acknowledged ping/pong. It uses Apple's Network framework
-with `includePeerToPeer` on browsing, listening and connections; it enables the
-system's peer-to-peer Wi-Fi paths and does **not require a shared router or
-hotspot**. The system may choose infrastructure Wi-Fi when available, so a
-successful shared-LAN test alone does not prove router-free operation. Actual
-router-free discovery/connection and privacy prompts require a physical-device test.
-
-The game/offline phone room and existing manual-address LAN portal remain under
-**Game / LAN portal**. Gameplay does not use this POC transport. Mode switches
-pause the game transport/motion; returning keeps the remembered game controller.
-The earlier reported real-phone LAN connection failure has not been diagnosed
-as fixed by this separate POC.
-
-From **this exact worktree**, with full Xcode installed:
+Exact commands from this worktree, with a JDK and full Xcode installed:
 
 ```sh
 cd /Users/maksimraklo/.ao/data/worktrees/portal/portal-maze
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-./gradlew :desktopApp:prepareNearbyHelper :desktopApp:run --args='--nearby-poc'
-```
-
-`run` also prepares the helper automatically. Do not rebuild JVM JARs while a
-previous development run remains open: close that window first. For an actual
-app bundle and its own macOS privacy identity, build and open the packaged app:
-
-```sh
 ./gradlew :desktopApp:createDistributable
-open desktopApp/build/compose/binaries/main/app/de.acorn42.portal.app --args --nearby-poc
-```
-
-Use either development run or packaged app, not both at once. The bundle includes
-the native helper at `Contents/app/resources/nearby/PortalNearbyHelper`, so it does
-not need Swift/Xcode installed at run time. Local builds are not notarized for
-internet distribution. The helper is built for the Mac's current architecture;
-this checkout was compiled on Apple Silicon. Native minimums are macOS 13 and
-iOS 18.2; the packaged Java runtime also imposes its own OS requirements. Current
-validation uses installed macOS 27, Xcode 27.1 and Swift 6.4, not older-OS hardware.
-
-Open the same checkout's iOS project:
-
-```sh
+open /Users/maksimraklo/.ao/data/worktrees/portal/portal-maze/desktopApp/build/compose/binaries/main/app/de.acorn42.portal.app
 open /Users/maksimraklo/.ao/data/worktrees/portal/portal-maze/iosApp/iosApp.xcodeproj
 ```
 
-Select **iosApp**, your physical iPhone, and your signing team, then Run. A developer
-account/device provisioning is needed to install on hardware. The top picker offers
-**Game / LAN portal** and **Nearby POC**. No host address or pairing code is entered
-in Nearby POC.
+In Xcode select scheme **iosApp**, your physical iPhone and your signing team,
+then Run. Provisioning is required on hardware. Allow **Local Network** access on
+both devices and **Motion** on the phone when asked. Keep firewall protections
+enabled; allow PORTAL if prompted. If privacy was denied, enable PORTAL in system
+Settings > Privacy & Security > Local Network and retry **Find my Mac** on iPhone
+or **Find iPhone** on Mac. A helper failure requires restarting the Mac app.
 
-Router-free acceptance test:
+For development instead of the bundle:
 
-1. Leave the Wi-Fi radios **on** on Mac and iPhone, place them nearby, and keep
-   both apps foreground. For proof without infrastructure, disconnect both from
-   their joined Wi-Fi networks while keeping Wi-Fi enabled; do not enable Personal
-   Hotspot or substitute a shared access point. No network settings are changed
-   automatically by PORTAL. Airplane mode/Wi-Fi radio off is not this test.
-2. On Mac choose **Nearby connection POC**, then **Advertise nearby Mac**. On iPhone
-   choose **Nearby POC**; it lists named Macs. Allow Local Network access if asked.
-   A permission prompt can pause discovery/advertising: after allowing it, tap
-   **Retry discovery** on iPhone or **Advertise nearby Mac** again on Mac.
-3. Tap exactly one Mac. Both screens show the peer's name/ephemeral ID and a
-   matching fingerprint. Compare them; on Mac choose **Accept iPhone** or **Reject**.
-   Other incoming connections are refused while one request/connection is active.
-4. After acceptance, both show connected identity. Use **Send ping** on each;
-   the sender's **Acknowledged pings** and receiver's **received** counts increase.
-   An unmatched/stale pong cannot acknowledge a current ping. No gameplay state
-   or LAN pairing credentials cross this transport.
-5. **Disconnect**, then **Retry discovery** on iPhone, select again and approve
-   again. Repeat with **Reject**. Background either app or leave this mode:
-   discovery/connections stop and retry is explicit. On Mac focus loss stops the
-   POC; refocus and advertise again. A ping without an acknowledgement times out
-   after five seconds; pending pairing times out after 25 seconds.
-6. Test denied Local Network access, then enable PORTAL in system Settings >
-   Privacy & Security > Local Network and retry explicitly. Keep firewall
-   protections enabled and allow the app if prompted. A helper failure requires
-   leaving/reopening Nearby POC; helper stdin closure/app exit terminates it.
+```sh
+./gradlew :desktopApp:prepareNearbyHelper :desktopApp:run
+```
 
-The simulator cannot prove AWDL/radio behavior or local-network privacy.
-`includePeerToPeer` is an API configuration, not a measured hardware success.
-If discovery stays empty, verify both radios, foreground state, selected app's
-Local Network access, physical proximity and supported Apple Wi-Fi hardware;
-report each app's status. Do not disable a firewall or silently fall back to a
-router/hotspot and count that as success.
+Use one desktop instance. Close it before rebuilding JVM resources or the bundle.
+The bundle includes its Java runtime and project-owned Swift helper at
+`Contents/app/resources/nearby/PortalNearbyHelper`; Swift/Xcode is not required to
+run it. Local builds are not notarized. The helper targets the current build
+architecture (Apple Silicon here). Native minimums: macOS 13, iOS 18.2; the bundled
+Java runtime adds its own requirements. Validation here uses macOS 27, Xcode 27.1
+and Swift 6.4; older physical systems have not been verified.
 
-A project-owned local Swift package in `native/nearby` is shared by iOS and a
-small Mac helper. The JVM bridge uses bounded JSON over private stdin/stdout;
-networking remains native. Wire messages are versioned, length-prefixed and
-bounded, with per-connection nonces, session/peer checks, explicit consent and
-unique ping acknowledgements. Names/IDs are self-reported. The fingerprint only
-correlates this request; **raw TCP is plaintext, without cryptographic device
-authentication**. This proximity POC is not a production secure channel and must
-not carry sensitive data. Apple selects the actual network path. Bonjour and
-usage declarations are included in iOS, Mac app and helper metadata; no global
-ATS bypass, multicast entitlement or Bluetooth implementation is added.
+Paired gameplay checklist:
 
-Native checks:
+1. Keep Wi-Fi enabled, both apps open and the Mac window visible. On iPhone tap
+   your named Mac, compare fingerprints, then **Accept iPhone** on Mac. Rejecting
+   or reconnecting requires fresh selection and consent. Other peers cannot
+   replace an active connection. The phone shows that it is waiting for a portal.
+2. Click the Mac maze. Move **D / Right** from the start into the violet ring at
+   `(4.5, 1.5)`. The sphere leaves the maze and appears in the phone room after
+   acknowledged transfer. WASD/arrow keys control only desktop ownership.
+3. Hold the phone fairly flat and **Calibrate**. Tilt through the first barrier
+   on its right, the second on its left, then reach the violet exit near the
+   bottom right. **Reset room** and labelled simulator/touch fallback remain.
+   Completion returns the sphere to `(5.5, 3.5)` and opens the orange Mac gate;
+   fog memory and camera tracking remain intact.
+4. Switch Mac keyboard focus to another window during phone play: the phone
+   continues. Held Mac keys clear. Minimizing/hiding the Mac pauses progression;
+   restoring it resumes availability. Backgrounding the phone pauses motion and
+   disconnects. Return, **Find my Mac**, select the same Mac and accept again;
+   the same transfer and latest retained checkpoint resume. Recalibrate tilt.
+   Repeat around completion: return/unlock must happen once, with one sphere.
+5. Router-free test: with Wi-Fi radios still **on**, manually disconnect both
+   devices from their joined router networks. Do not substitute a hotspot or
+   shared access point. Repeat discovery, consent and the complete portal loop.
+   PORTAL does not change network settings. A successful shared-LAN or simulator
+   test alone does not establish router-free operation.
+
+Network failure detection takes up to about five seconds after a heartbeat;
+then both sides pause. Recovery is in memory: keep both processes running and
+reselect the original peer. Restart **both** apps to start a fresh game or change
+the paired device. No disk persistence, OS wake or app switching is implemented.
+Physical router-free discovery, privacy prompts, tilt and haptics need real-device
+playtesting. Compilation and loopback do not prove AWDL/radio success.
+
+### Implementation and trust boundaries
+
+Apple Network framework `NWBrowser`, `NWListener` and `NWConnection` all use
+`includePeerToPeer = true`, enabling infrastructure-free peer-to-peer Wi-Fi.
+Bonjour `_portalnear._tcp` advertises protocol/game capability. Apple selects the
+actual network path and may use infrastructure when present. The native Swift
+package is shared by iPhone and a small JVM-owned helper, whose stdin EOF ends
+its process. iOS, helper and packaged Mac metadata declare local-network usage
+and the service. No Bluetooth, multicast entitlement or global ATS bypass is
+used; obsolete HTTP/ATS exceptions and the unused Ktor transport were removed.
+
+Length-prefixed native JSON frames are bounded at 64 KiB, gameplay payloads at
+16 KiB. Consent/session nonces and connection request IDs bind the accepted peer;
+old connections and unsupported gameplay capability are rejected. The existing
+v1 `PortalSession`/`PhoneReplica` messages remain unchanged. The Mac serializes
+revisioned snapshots and authoritatively assigns one active owner, unique
+outbound/return IDs and the gate unlock. Acknowledgements advance ownership;
+checkpoint sequences and retained outboxes recover dropped replies. Resume
+credentials and generations reject stale/wrong-session inputs. Native consent
+replaces manual admission; credentials still protect gameplay resume consistency.
+
+Names/IDs are self-reported, and the comparison fingerprint only correlates the
+request. **Raw TCP is plaintext and is not cryptographic device authentication.**
+This is a cooperative nearby prototype. The Mac validates finite coordinates,
+speed, wall clearance, room/transfer IDs and completion at the exit; it trusts
+the phone's local trajectory for responsive tilt and does not prove puzzle
+fairness by replaying inputs. Clients cannot select the desktop exit or unlock
+value. Production security, anti-cheat and persistence are outside this scope.
+
+Pure common world models keep the existing 120 Hz bounded fixed-step movement,
+normalized diagonal input, swept circle-wall collisions, camera transforms and
+wall-occluded exploration independent of platform input/transport. Compose draws
+the maze/puzzle. Phone motion lifecycle remains separate from native networking.
+
+Relevant checks:
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test --package-path native/nearby
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./gradlew :desktopApp:test :shared:jvmTest :desktopApp:createDistributable
-```
-
-See Apple's [peer-to-peer networking guidance](https://developer.apple.com/documentation/network/nwparameters/includepeertopeer),
-[custom protocol sample](https://developer.apple.com/documentation/network/building-a-custom-peer-to-peer-protocol),
-[device discovery explanation](https://developer.apple.com/videos/play/wwdc2019/713/)
-and [local-network privacy guidance](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
-
-### Play the first cross-device portal
-
-This local prototype supports one Mac and one iPhone on the **same trusted Wi-Fi**.
-Keep both apps foreground; it does not wake or switch apps. Use a private IPv4
-address (`10.x.x.x`, `172.16–31.x.x`, or `192.168.x.x`), not a guest network with
-client isolation. Session progress and pairing credentials exist only in memory;
-keep both processes running during recovery tests. Restart both to begin a new
-session or replace the paired phone.
-
-1. Run `./gradlew :desktopApp:run` from this checkout. Click **Start phone session**.
-   The session bar shows the Mac address, port `8765`, and a six-digit code valid
-   for five minutes. **New code** refreshes it before pairing. Allow incoming
-   connections/local-network access if macOS asks. Do not open the port to the internet.
-2. Open `iosApp/iosApp.xcodeproj` in Xcode, select scheme **iosApp**, choose your
-   physical iPhone, configure your signing team if necessary, and Run. The existing
-   **offline test room** remains the initial screen. Tap **Pair with Mac**, enter
-   one displayed Mac Wi-Fi address followed by `:8765` and the code, then **Pair**.
-   Allow **Local Network** access. If denied, enable PORTAL in Settings > Privacy
-   & Security > Local Network, then retry. No Bonjour discovery is used.
-3. Keep the Mac game window focused. Move right from the start with **D / Right**
-   to the violet ring at `(4.5, 1.5)`. The Mac sphere disappears while the phone
-   prepares and acknowledges the room. Only the active device can move it.
-4. Hold the phone fairly flat and tap **Calibrate**. Tilt gently through the existing
-   pocket room: pass the first barrier on its right, the second on its left, then
-   reach the violet exit near the bottom right. Touch fallback remains available.
-   The completed room is acknowledged, the sphere returns to `(5.5, 3.5)` on the Mac,
-   and the orange gate above it opens. Explore through it; fog memory is retained.
-5. To test recovery, briefly turn off phone Wi-Fi or background either app during
-   phone play or a transition. Gameplay pauses once the connection/foreground loss
-   is detected (network failure detection takes several seconds). Restore Wi-Fi and
-   foreground both apps. The phone reconnects automatically or offers **Reconnect**;
-   recalibrate after resuming. Latest local progress, transfer identity and one-time
-   unlock survive reconnect; an acknowledged completion cannot duplicate the sphere.
-   **Offline mode** disconnects without abandoning the retained paired session.
-
-Native desktop launch does not use a web preview. Simulator runs can use
-`127.0.0.1:8765` with touch fallback, but cannot verify Core Motion, physical haptics,
-or Apple's local-network permission prompt. Physical two-device playtesting is
-required for those behaviors and real Wi-Fi/firewall conditions.
-
-The wire protocol is JSON over Ktor 3.6 WebSockets at `/portal/v1`, version `1`,
-with 16 KiB packet/frame limits. The Mac serializes session state, emits revisioned
-snapshots, assigns unique outbound/return IDs, and waits for acknowledgements before
-changing ownership. Reconnecting rotates the connection generation, invalidating old
-inputs and disconnect callbacks. Phone checkpoints carry increasing sequences and
-stay in the client outbox until acknowledged; duplicate/stale events cannot reapply
-return/unlock. A short-lived code pairs one phone; a random resume token restores it.
-
-This is a cooperative LAN demo using plaintext `ws://`, **not an authenticated,
-encrypted transport against a hostile network**. A network observer can read pairing
-and resume credentials. The Mac validates session, generation, transfer, room,
-sequence, finite values, speed, collision clearance and completion-at-exit. It trusts
-the phone's local trajectory for responsive tilt; it does not replay inputs to prove
-a puzzle was solved fairly. Clients cannot choose the desktop exit or unlock value.
-Disk persistence, anti-cheat and TLS provisioning are outside this milestone.
-
-Apple configuration scopes insecure HTTP exceptions to private IPv4 ranges and
-loopback (supported by the project's iOS 18.2 minimum), alongside
-`NSLocalNetworkUsageDescription` and `NSAllowsLocalNetworking`. No global ATS bypass,
-Bonjour service declaration or multicast entitlement is added. See Apple's
-[IP address exception guidance](https://developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity/nsexceptiondomains)
-and [local-network privacy guidance](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
-Networking follows the official Ktor
-[server WebSockets](https://ktor.io/docs/server-websockets.html) and
-[client WebSockets](https://ktor.io/docs/client-websockets.html) APIs; iOS uses the
-[Darwin engine](https://ktor.io/docs/client-engines.html#darwin).
-
-Combined checks:
-
-```sh
-./gradlew :shared:jvmTest :desktopApp:test :desktopApp:compileKotlin :shared:compileKotlinIosSimulatorArm64
+./gradlew :shared:jvmTest :desktopApp:test :desktopApp:compileKotlin :shared:compileKotlinIosArm64 :shared:compileKotlinIosSimulatorArm64
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator \
   -configuration Debug -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /tmp/portal-ios-derived CODE_SIGNING_ALLOWED=NO build
+  -derivedDataPath /tmp/portal-2-nearby-gameplay-derived CODE_SIGNING_ALLOWED=NO build
 ```
+
+Official Apple guidance: [peer-to-peer parameters](https://developer.apple.com/documentation/network/nwparameters/includepeertopeer),
+[custom peer-to-peer protocol](https://developer.apple.com/documentation/network/building-a-custom-peer-to-peer-protocol),
+[device discovery](https://developer.apple.com/videos/play/wwdc2019/713/),
+[local-network privacy](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
 
 ---
 

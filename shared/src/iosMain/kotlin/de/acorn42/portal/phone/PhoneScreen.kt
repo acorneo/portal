@@ -27,17 +27,9 @@ private val Mint = Color(0xFF6FFFE2)
 private val Muted = Color(0xFF9AAEC4)
 
 @Composable
-fun PhoneScreen(onPair: (() -> Unit)? = null) {
-    val host = rememberPhoneHost()
-    PhonePuzzleScreen(host, "OFFLINE", onLeave = onPair, leaveText = "Pair with Mac")
-}
-
-@Composable
 internal fun PhonePuzzleScreen(
     host: PhoneHost,
     label: String,
-    onLeave: (() -> Unit)? = null,
-    leaveText: String = "Disconnect",
     connectionMessage: String? = null,
 ) {
     MaterialTheme(colorScheme = darkColorScheme(background = Ink, primary = Mint)) {
@@ -49,7 +41,6 @@ internal fun PhonePuzzleScreen(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(label, color = Muted, fontSize = 10.sp)
-                    if (onLeave != null) TextButton(onClick = onLeave) { Text(leaveText, fontSize = 11.sp) }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -59,7 +50,7 @@ internal fun PhonePuzzleScreen(
             Text(host.message, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             if (connectionMessage != null) Text(connectionMessage, color = Muted, fontSize = 11.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = host::reset, enabled = host.active && (label == "OFFLINE" || !host.state.completed)) { Text("Reset room") }
+                Button(onClick = host::reset, enabled = host.active && !host.state.completed) { Text("Reset room") }
                 if (!host.touchMode) OutlinedButton(onClick = host::calibrate, enabled = host.active && host.hasSample && !host.state.completed) { Text("Calibrate") }
             }
             if (host.touchMode) {

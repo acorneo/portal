@@ -3,6 +3,6 @@
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>de.acorn42.portal.nearby-helper</string>
 <key>CFBundleName</key><string>PORTAL Nearby Helper</string>
-<key>NSLocalNetworkUsageDescription</key><string>PORTAL discovers and connects to a nearby iPhone using peer-to-peer Wi-Fi for the connection proof of concept.</string>
+<key>NSLocalNetworkUsageDescription</key><string>PORTAL discovers and connects to a nearby iPhone using peer-to-peer Wi-Fi to play PORTAL together.</string>
 <key>NSBonjourServices</key><array><string>_portalnear._tcp</string></array>
 </dict></plist>

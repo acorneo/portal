@@ -4,6 +4,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import de.acorn42.portal.portal.MAX_PACKET_BYTES
 import kotlinx.serialization.json.*
 import java.io.File
 import java.io.Reader
@@ -11,7 +13,7 @@ import java.util.concurrent.TimeUnit
 
 internal data class NearbyStatus(
     val phase: String = "starting",
-    val message: String = "Preparing native nearby helper…",
+    val message: String = "Preparing nearby connection…",
     val localName: String = "",
     val localID: String = "",
     val peerName: String = "",
@@ -23,7 +25,21 @@ internal data class NearbyStatus(
     val pendingPing: Boolean = false,
 )
 
+internal sealed interface NearbyBridgeEvent {
+    data class Status(val value: NearbyStatus) : NearbyBridgeEvent
+    data class Game(val connectionID: String, val peerID: String, val payload: String) : NearbyBridgeEvent
+}
+
 internal object NearbyBridgeCodec {
+    fun event(line: String): NearbyBridgeEvent {
+        require(line.toByteArray().size <= 65536)
+        val json = Json.parseToJsonElement(line).jsonObject
+        if (json["event"]?.jsonPrimitive?.content != "game") return NearbyBridgeEvent.Status(decode(line))
+        fun text(key: String) = json.getValue(key).jsonPrimitive.let { require(it.isString); it.content }
+        val payload = text("payload").also { require(it.toByteArray().size <= MAX_PACKET_BYTES) }
+        return NearbyBridgeEvent.Game(text("connectionID").also { require(it.length in 1..80) }, text("peerID").also { require(it.length in 1..100) }, payload)
+    }
+
     private val phases = setOf("stopped", "starting", "advertising", "awaitingHello", "awaitingOffer", "awaitingApproval", "awaitingAcceptance", "connected", "closed", "disconnected")
     fun decode(line: String): NearbyStatus {
         require(line.toByteArray().size <= 32768)
@@ -35,10 +51,10 @@ internal object NearbyBridgeCodec {
         val phase = text("phase").also { require(it in phases) }
         return NearbyStatus(phase, text("message"), text("localName"), text("localID"), text("peerName"), text("peerID"), text("fingerprint"), text("requestID"), count("acknowledgements"), count("receivedPings"), json.getValue("pendingPing").jsonPrimitive.boolean)
     }
-    fun command(kind: String, requestID: String = ""): String {
-        require(kind in setOf("advertise", "accept", "reject", "ping", "disconnect", "stop", "quit"))
-        require(requestID.length <= 80)
-        return buildJsonObject { put("kind", kind); put("requestID", requestID) }.toString() + "\n"
+    fun command(kind: String, requestID: String = "", payload: String = ""): String {
+        require(kind in setOf("advertise", "accept", "reject", "ping", "disconnect", "stop", "quit", "game"))
+        require(requestID.length <= 80 && payload.toByteArray().size <= MAX_PACKET_BYTES)
+        return buildJsonObject { put("kind", kind); put("requestID", requestID); if (kind == "game") put("payload", payload) }.toString() + "\n"
     }
     fun line(reader: Reader): String? {
         val result = StringBuilder()
@@ -46,7 +62,7 @@ internal object NearbyBridgeCodec {
             val next = reader.read()
             if (next < 0) return if (result.isEmpty()) null else error("Truncated helper message")
             if (next == 10) return result.toString()
-            require(result.length < 32768) { "Oversized helper message" }
+            require(result.length < 65536) { "Oversized helper message" }
             result.append(next.toChar())
         }
     }
@@ -58,7 +74,9 @@ internal class NearbyBridge(private val helper: File) : AutoCloseable {
     private val mutableState = MutableStateFlow(NearbyStatus())
     val state = mutableState.asStateFlow()
     private val lock = Any()
-    private val commands = Channel<String>(32)
+    private val commands = Channel<String>(64)
+    private val eventChannel = Channel<NearbyBridgeEvent>(64)
+    val events = eventChannel.receiveAsFlow()
     private var process: Process? = null
     @Volatile private var closed = false
     private val shutdown = Thread { synchronized(lock) { process?.destroy() } }
@@ -85,28 +103,38 @@ internal class NearbyBridge(private val helper: File) : AutoCloseable {
                 launched.inputStream.bufferedReader().use { reader ->
                     while (isActive) {
                         val line = NearbyBridgeCodec.line(reader) ?: break
-                        val status = NearbyBridgeCodec.decode(line)
-                        if (!closed) mutableState.value = status
+                        val event = NearbyBridgeCodec.event(line)
+                        if (!closed) {
+                            if (event is NearbyBridgeEvent.Status) mutableState.value = event.value
+                            eventChannel.send(event)
+                        }
                     }
                 }
                 writer.cancel()
                 stderr.cancel()
-                if (!closed) mutableState.value = NearbyStatus("failed", "Native helper exited · leave/reopen Nearby POC to retry")
+                if (!closed) failed("Connection service exited · restart PORTAL to retry")
             } catch (error: Exception) {
-                if (!closed) mutableState.value = NearbyStatus("failed", "Nearby helper failed: ${error.message?.take(160)}")
+                if (!closed) failed("Nearby connection failed: ${error.message?.take(160)}")
             } finally {
                 synchronized(lock) { process = null }
                 child?.destroy()
             }
         }
     }
-    fun command(kind: String, requestID: String = "") {
-        val line = NearbyBridgeCodec.command(kind, requestID)
+    fun command(kind: String, requestID: String = "", payload: String = "") {
+        val line = NearbyBridgeCodec.command(kind, requestID, payload)
         if (!closed && !commands.trySend(line).isSuccess) {
-            mutableState.value = NearbyStatus("failed", "Too many helper commands · leave/reopen Nearby POC")
+            mutableState.value = NearbyStatus("failed", "Connection queue full · restart PORTAL")
             close()
         }
     }
+
+    private suspend fun failed(message: String) {
+        val status = NearbyStatus("failed", message)
+        mutableState.value = status
+        eventChannel.send(NearbyBridgeEvent.Status(status))
+    }
+    fun sendGame(connectionID: String, payload: String) = command("game", connectionID, payload)
 
     override fun close() {
         closed = true

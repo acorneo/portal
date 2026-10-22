@@ -40,6 +40,22 @@ final class NearbyLoopbackTests: XCTestCase {
         XCTAssertEqual(host.status.phase, "awaitingApproval")
         host.decide(request: host.status.requestID, accept: true)
         await fulfillment(of: [connected], timeout: 4)
+        let gameAtHost = expectation(description: "gameplay reaches consented Mac")
+        let gameAtPhone = expectation(description: "snapshot reaches selected phone")
+        var hostPayloads: [String] = []
+        host.receivedGame = { payload in
+            hostPayloads.append(payload)
+            gameAtHost.fulfill()
+            host.sendGame("{\"snapshot\":1}", request: host.status.requestID)
+        }
+        phone.receivedGame = { payload in
+            XCTAssertEqual(payload, "{\"snapshot\":1}")
+            gameAtPhone.fulfill()
+        }
+        phone.sendGame("stale request must not send", request: "stale")
+        phone.sendGame("{\"transfer\":\"unique-1\"}", request: phone.status.requestID)
+        await fulfillment(of: [gameAtHost, gameAtPhone], timeout: 4)
+        XCTAssertEqual(hostPayloads, ["{\"transfer\":\"unique-1\"}"])
         let pong = expectation(description: "real framed ping/pong acknowledged")
         var acknowledged = false
         phone.changed = { status in

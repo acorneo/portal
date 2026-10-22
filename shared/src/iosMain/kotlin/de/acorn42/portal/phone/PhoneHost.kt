@@ -160,7 +160,7 @@ internal class PhoneHost {
             val events = puzzle.step(input, seconds)
             if (events.exited) {
                 stopInput()
-                message = "Exit reached · offline room complete"
+                message = "Exit reached · returning to your Mac"
                 success.notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
             } else if (events.impactSpeed > 0.35 && now() - lastImpact > 0.12) {
                 impact.impactOccurred()

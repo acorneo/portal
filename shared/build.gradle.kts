@@ -21,9 +21,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.websockets)
-            implementation(libs.ktor.serialization.json)
+            implementation(libs.kotlinx.serializationJson)
             implementation(libs.kotlinx.coroutinesCore)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
@@ -36,15 +34,6 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-        }
-        jvmMain.dependencies {
-            implementation(libs.ktor.client.cio)
-            implementation(libs.ktor.server.core)
-            implementation(libs.ktor.server.cio)
-            implementation(libs.ktor.server.websockets)
-        }
-        iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
         }
     }
 }

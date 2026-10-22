@@ -3,12 +3,15 @@ import CryptoKit
 
 public let nearbyService = "_portalnear._tcp"
 public let nearbyVersion = 1
-public let nearbyMaxFrame = 4096
+public let nearbyMaxFrame = 65536
+public let nearbyMaxGamePayload = 16384
 
 public enum NearbyFailure: Error { case invalidFrame, invalidMessage, unexpectedMessage }
 
 public struct NearbyMessage: Codable, Equatable {
     public var version = nearbyVersion
+    public var gameVersion: Int? = 1
+    public var payload: String? = nil
     public var kind: String
     public var session = ""
     public var peerID = ""
@@ -21,9 +24,11 @@ public struct NearbyMessage: Codable, Equatable {
         self.nonce = nonce; self.echo = echo; self.id = id
     }
     public func validate() throws {
-        guard version == nearbyVersion, ["hello", "offer", "accept", "reject", "ping", "pong", "bye"].contains(kind),
+        guard version == nearbyVersion, ["hello", "offer", "accept", "reject", "ping", "pong", "bye", "game"].contains(kind),
               [session, peerID, nonce, echo, id].allSatisfy({ $0.utf8.count <= 80 }), name.utf8.count <= 96,
-              name.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else { throw NearbyFailure.invalidMessage }
+              name.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }),
+              payload == nil || payload!.utf8.count <= nearbyMaxGamePayload,
+              gameVersion == nil || gameVersion == 1 else { throw NearbyFailure.invalidMessage }
     }
 }
 
@@ -112,11 +117,12 @@ public struct NearbyMachine {
               UUID(uuidString: message.peerID) != nil, UUID(uuidString: message.nonce) != nil else { throw NearbyFailure.invalidMessage }
         switch (host, phase, message.kind) {
         case (true, .awaitingHello, "hello"):
+            guard message.gameVersion == 1 else { throw NearbyFailure.invalidMessage }
             peer = NearbyIdentity(id: message.peerID, name: message.name); peerNonce = message.nonce
             correlate(); phase = .awaitingApproval
             return [packet("offer")]
         case (false, .awaitingOffer, "offer"):
-            guard message.echo == nonce, message.peerID == session else { throw NearbyFailure.invalidMessage }
+            guard message.echo == nonce, message.peerID == session, message.gameVersion == 1 else { throw NearbyFailure.invalidMessage }
             peer = NearbyIdentity(id: message.peerID, name: message.name); peerNonce = message.nonce
             correlate(); phase = .awaitingAcceptance
             return []
@@ -125,6 +131,10 @@ public struct NearbyMachine {
             return []
         case (_, _, "reject"), (_, _, "bye"):
             try verify(message); phase = .closed; pendingPing = nil
+            return []
+        case (_, .connected, "game"):
+            try verify(message)
+            guard message.payload != nil else { throw NearbyFailure.invalidMessage }
             return []
         case (_, .connected, "ping"):
             try verify(message)
@@ -148,6 +158,11 @@ public struct NearbyMachine {
         guard host && phase == .awaitingApproval else { throw NearbyFailure.unexpectedMessage }
         phase = accept ? .connected : .closed
         return packet(accept ? "accept" : "reject")
+    }
+    public func game(_ payload: String) throws -> NearbyMessage {
+        guard phase == .connected, payload.utf8.count <= nearbyMaxGamePayload else { throw NearbyFailure.unexpectedMessage }
+        var message = packet("game"); message.payload = payload
+        return message
     }
     public mutating func ping(id: String = UUID().uuidString) throws -> NearbyMessage {
         guard phase == .connected, pendingPing == nil, UUID(uuidString: id) != nil else { throw NearbyFailure.unexpectedMessage }
