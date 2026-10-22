@@ -19,6 +19,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import de.acorn42.portal.portal.*
+import de.acorn42.portal.nearby.NearbyPanel
 import de.acorn42.portal.world.FixedStepClock
 import de.acorn42.portal.world.Sphere
 import de.acorn42.portal.world.WorldSimulation
@@ -27,12 +28,13 @@ import java.awt.Dimension
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 
-fun main() = application {
+fun main(args: Array<String>) = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "PORTAL — Beyond the Screen",
         state = rememberWindowState(width = 1080.dp, height = 780.dp),
     ) {
+        var nearbyMode by remember { mutableStateOf("--nearby-poc" in args) }
         val input = remember { DesktopInput() }
         var simulation by remember { mutableStateOf(WorldSimulation(PortalLevel.closedMaze)) }
         val host = remember { DesktopPortalHost() }
@@ -48,7 +50,7 @@ fun main() = application {
         var visibility by remember { mutableStateOf(simulation.exploration.state) }
         var windowFocused by remember { mutableStateOf(window.isFocused) }
         var contentFocused by remember { mutableStateOf(false) }
-        val active = windowFocused && contentFocused && session.desktopCanMove
+        val active = windowFocused && contentFocused && session.desktopCanMove && !nearbyMode
 
         DisposableEffect(window) {
             window.minimumSize = Dimension(600, 620)
@@ -71,9 +73,9 @@ fun main() = application {
             }
         }
 
-        LaunchedEffect(windowFocused) {
-            host.hostForeground(windowFocused)
-            if (windowFocused) focusRequester.requestFocus()
+        LaunchedEffect(windowFocused, nearbyMode) {
+            host.hostForeground(windowFocused && !nearbyMode)
+            if (windowFocused && !nearbyMode) focusRequester.requestFocus()
         }
 
         LaunchedEffect(session.gateUnlocked, session.returnId) {
@@ -105,53 +107,62 @@ fun main() = application {
 
         MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF6FFFE2))) {
             Column(Modifier.fillMaxSize().background(Color(0xFF080F1B))) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    if (!hostInfo.started) Button(
-                        enabled = !starting,
-                        onClick = {
-                            starting = true
-                            scope.launch {
-                                try { host.start() } catch (_: Exception) { /* HostInfo contains the actionable startup error. */ }
-                                finally { starting = false; focusRequester.requestFocus() }
-                            }
-                        },
-                    ) { Text(if (starting) "Starting…" else "Start phone session") }
-                    Column(Modifier.weight(1f)) {
-                        if (hostInfo.started) {
-                            Text("MAC  ${addresses.ifBlank { "No Wi-Fi IPv4 address" }} · port ${hostInfo.port}", color = Color.White, fontSize = 12.sp)
-                            Text(if (session.clientId == null) "PAIR CODE  ${hostInfo.pairCode} · expires after 5 minutes" else "iPhone paired · keep both apps foreground", color = Color(0xFFBD91FF), fontSize = 12.sp)
-                        }
-                        Text(if (session.clientId != null) "Session progress retained while both processes stay open" else hostInfo.message, color = Color(0xFF9AAEC4), fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = { nearbyMode = !nearbyMode }) {
+                        Text(if (nearbyMode) "Back to game / LAN portal" else "Nearby connection POC")
                     }
-                    if (hostInfo.started && session.clientId == null) TextButton(onClick = { scope.launch { host.refreshCode() }; focusRequester.requestFocus() }) { Text("New code") }
+                    if (nearbyMode) Text("Game / LAN paused", color = Color(0xFF9AAEC4), fontSize = 11.sp)
                 }
-                App(
-                    maze = simulation.maze,
-                    sphere = sphere,
-                    visibility = visibility,
-                    controls = when {
-                        session.gateUnlocked -> "Gate open · Sphere returned · WASD / Arrow keys to explore"
-                        session.clientId != null && !session.ready -> "Paused · reconnect your iPhone and keep both apps foreground"
-                        session.phase == TransferPhase.Phone -> "Continue on your iPhone · tilt through the pocket room to its exit"
-                        session.phase == TransferPhase.OutboundPending -> "Sending sphere to your iPhone…"
-                        session.phase == TransferPhase.ReturnPending -> "Returning sphere · waiting for iPhone acknowledgement…"
-                        session.ready -> "WASD / Arrows · enter the violet ring to travel to your iPhone"
-                        else -> "WASD / Arrows · start a session and pair an iPhone to activate the violet portal"
-                    },
-                    active = active,
-                    sphereVisible = session.owner == ActiveDevice.Desktop,
-                    portals = true,
-                    gateUnlocked = session.gateUnlocked,
-                    modifier = Modifier.weight(1f)
-                        .focusRequester(focusRequester)
-                        .onFocusChanged {
-                            contentFocused = it.hasFocus
-                            if (!it.hasFocus) input.clear()
+                if (nearbyMode) NearbyPanel(windowFocused)
+                else {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (!hostInfo.started) Button(
+                            enabled = !starting,
+                            onClick = {
+                                starting = true
+                                scope.launch {
+                                    try { host.start() } catch (_: Exception) { /* HostInfo contains the actionable startup error. */ }
+                                    finally { starting = false; focusRequester.requestFocus() }
+                                }
+                            },
+                        ) { Text(if (starting) "Starting…" else "Start phone session") }
+                        Column(Modifier.weight(1f)) {
+                            if (hostInfo.started) {
+                                Text("MAC  ${addresses.ifBlank { "No Wi-Fi IPv4 address" }} · port ${hostInfo.port}", color = Color.White, fontSize = 12.sp)
+                                Text(if (session.clientId == null) "PAIR CODE  ${hostInfo.pairCode} · expires after 5 minutes" else "iPhone paired · keep both apps foreground", color = Color(0xFFBD91FF), fontSize = 12.sp)
+                            }
+                            Text(if (session.clientId != null) "Session progress retained while both processes stay open" else hostInfo.message, color = Color(0xFF9AAEC4), fontSize = 11.sp)
                         }
-                        .onPreviewKeyEvent { if (windowFocused) input.handle(it) else false }
-                        .focusable()
-                        .pointerInput(Unit) { detectTapGestures { focusRequester.requestFocus() } },
-                )
+                        if (hostInfo.started && session.clientId == null) TextButton(onClick = { scope.launch { host.refreshCode() }; focusRequester.requestFocus() }) { Text("New code") }
+                    }
+                    App(
+                        maze = simulation.maze,
+                        sphere = sphere,
+                        visibility = visibility,
+                        controls = when {
+                            session.gateUnlocked -> "Gate open · Sphere returned · WASD / Arrow keys to explore"
+                            session.clientId != null && !session.ready -> "Paused · reconnect your iPhone and keep both apps foreground"
+                            session.phase == TransferPhase.Phone -> "Continue on your iPhone · tilt through the pocket room to its exit"
+                            session.phase == TransferPhase.OutboundPending -> "Sending sphere to your iPhone…"
+                            session.phase == TransferPhase.ReturnPending -> "Returning sphere · waiting for iPhone acknowledgement…"
+                            session.ready -> "WASD / Arrows · enter the violet ring to travel to your iPhone"
+                            else -> "WASD / Arrows · start a session and pair an iPhone to activate the violet portal"
+                        },
+                        active = active,
+                        sphereVisible = session.owner == ActiveDevice.Desktop,
+                        portals = true,
+                        gateUnlocked = session.gateUnlocked,
+                        modifier = Modifier.weight(1f)
+                            .focusRequester(focusRequester)
+                            .onFocusChanged {
+                                contentFocused = it.hasFocus
+                                if (!it.hasFocus) input.clear()
+                            }
+                            .onPreviewKeyEvent { if (windowFocused) input.handle(it) else false }
+                            .focusable()
+                            .pointerInput(Unit) { detectTapGestures { focusRequester.requestFocus() } },
+                    )
+                }
             }
         }
     }

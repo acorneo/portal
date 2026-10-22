@@ -5,7 +5,9 @@
         <key>NSMotionUsageDescription</key>
         <string>PORTAL uses your phone’s tilt to roll the sphere in its pocket puzzle room.</string>
         <key>NSLocalNetworkUsageDescription</key>
-        <string>PORTAL connects to your Mac on the same Wi-Fi to transfer the sphere between screens.</string>
+        <string>PORTAL discovers nearby Macs over peer-to-peer Wi-Fi for its connection POC and connects to your Mac for the LAN portal demo.</string>
+        <key>NSBonjourServices</key>
+        <array><string>_portalnear._tcp</string></array>
         <key>NSAppTransportSecurity</key>
         <dict>
             <key>NSAllowsLocalNetworking</key>

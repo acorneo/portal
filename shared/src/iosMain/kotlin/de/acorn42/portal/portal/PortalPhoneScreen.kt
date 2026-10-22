@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -23,12 +26,31 @@ fun PortalPhoneScreen() {
     val client = remember { PortalClient(scope) }
     var pairedMode by remember { mutableStateOf(false) }
     var foreground by remember { mutableStateOf(UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive) }
-    DisposableEffect(client) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val currentPairedMode by rememberUpdatedState(pairedMode)
+    DisposableEffect(client, lifecycle) {
+        fun updateForeground(value: Boolean) {
+            foreground = value
+            // Transport follows presentation too; the remembered game controller
+            // can remain alive while the separate native Nearby screen is shown.
+            client.foreground(value && currentPairedMode)
+        }
+        fun resume() = updateForeground(lifecycle.currentState == Lifecycle.State.RESUMED &&
+            UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive)
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> resume()
+                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> updateForeground(false)
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
         val center = NSNotificationCenter.defaultCenter
-        val inactive = center.addObserverForName(UIApplicationWillResignActiveNotification, null, NSOperationQueue.mainQueue) { foreground = false }
-        val background = center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue) { foreground = false }
-        val active = center.addObserverForName(UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue) { foreground = true }
+        val inactive = center.addObserverForName(UIApplicationWillResignActiveNotification, null, NSOperationQueue.mainQueue) { updateForeground(false) }
+        val background = center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue) { updateForeground(false) }
+        val active = center.addObserverForName(UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue) { resume() }
         onDispose {
+            lifecycle.removeObserver(observer)
             center.removeObserver(inactive); center.removeObserver(background); center.removeObserver(active)
             client.close()
         }

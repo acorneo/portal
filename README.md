@@ -53,6 +53,116 @@ owns keyboard events, window focus, and simulation frame timing. The iOS entry
 point displays the dedicated phone puzzle, with offline and paired modes.
 
 
+### Nearby connection POC — peer-to-peer Wi-Fi
+
+This separate **Nearby POC** mode tests native Mac/iPhone discovery, explicit
+pairing consent and acknowledged ping/pong. It uses Apple's Network framework
+with `includePeerToPeer` on browsing, listening and connections; it enables the
+system's peer-to-peer Wi-Fi paths and does **not require a shared router or
+hotspot**. The system may choose infrastructure Wi-Fi when available, so a
+successful shared-LAN test alone does not prove router-free operation. Actual
+router-free discovery/connection and privacy prompts require a physical-device test.
+
+The game/offline phone room and existing manual-address LAN portal remain under
+**Game / LAN portal**. Gameplay does not use this POC transport. Mode switches
+pause the game transport/motion; returning keeps the remembered game controller.
+The earlier reported real-phone LAN connection failure has not been diagnosed
+as fixed by this separate POC.
+
+From **this exact worktree**, with full Xcode installed:
+
+```sh
+cd /Users/maksimraklo/.ao/data/worktrees/portal/portal-maze
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+./gradlew :desktopApp:prepareNearbyHelper :desktopApp:run --args='--nearby-poc'
+```
+
+`run` also prepares the helper automatically. Do not rebuild JVM JARs while a
+previous development run remains open: close that window first. For an actual
+app bundle and its own macOS privacy identity, build and open the packaged app:
+
+```sh
+./gradlew :desktopApp:createDistributable
+open desktopApp/build/compose/binaries/main/app/de.acorn42.portal.app --args --nearby-poc
+```
+
+Use either development run or packaged app, not both at once. The bundle includes
+the native helper at `Contents/app/resources/nearby/PortalNearbyHelper`, so it does
+not need Swift/Xcode installed at run time. Local builds are not notarized for
+internet distribution. The helper is built for the Mac's current architecture;
+this checkout was compiled on Apple Silicon. Native minimums are macOS 13 and
+iOS 18.2; the packaged Java runtime also imposes its own OS requirements. Current
+validation uses installed macOS 27, Xcode 27.1 and Swift 6.4, not older-OS hardware.
+
+Open the same checkout's iOS project:
+
+```sh
+open /Users/maksimraklo/.ao/data/worktrees/portal/portal-maze/iosApp/iosApp.xcodeproj
+```
+
+Select **iosApp**, your physical iPhone, and your signing team, then Run. A developer
+account/device provisioning is needed to install on hardware. The top picker offers
+**Game / LAN portal** and **Nearby POC**. No host address or pairing code is entered
+in Nearby POC.
+
+Router-free acceptance test:
+
+1. Leave the Wi-Fi radios **on** on Mac and iPhone, place them nearby, and keep
+   both apps foreground. For proof without infrastructure, disconnect both from
+   their joined Wi-Fi networks while keeping Wi-Fi enabled; do not enable Personal
+   Hotspot or substitute a shared access point. No network settings are changed
+   automatically by PORTAL. Airplane mode/Wi-Fi radio off is not this test.
+2. On Mac choose **Nearby connection POC**, then **Advertise nearby Mac**. On iPhone
+   choose **Nearby POC**; it lists named Macs. Allow Local Network access if asked.
+   A permission prompt can pause discovery/advertising: after allowing it, tap
+   **Retry discovery** on iPhone or **Advertise nearby Mac** again on Mac.
+3. Tap exactly one Mac. Both screens show the peer's name/ephemeral ID and a
+   matching fingerprint. Compare them; on Mac choose **Accept iPhone** or **Reject**.
+   Other incoming connections are refused while one request/connection is active.
+4. After acceptance, both show connected identity. Use **Send ping** on each;
+   the sender's **Acknowledged pings** and receiver's **received** counts increase.
+   An unmatched/stale pong cannot acknowledge a current ping. No gameplay state
+   or LAN pairing credentials cross this transport.
+5. **Disconnect**, then **Retry discovery** on iPhone, select again and approve
+   again. Repeat with **Reject**. Background either app or leave this mode:
+   discovery/connections stop and retry is explicit. On Mac focus loss stops the
+   POC; refocus and advertise again. A ping without an acknowledgement times out
+   after five seconds; pending pairing times out after 25 seconds.
+6. Test denied Local Network access, then enable PORTAL in system Settings >
+   Privacy & Security > Local Network and retry explicitly. Keep firewall
+   protections enabled and allow the app if prompted. A helper failure requires
+   leaving/reopening Nearby POC; helper stdin closure/app exit terminates it.
+
+The simulator cannot prove AWDL/radio behavior or local-network privacy.
+`includePeerToPeer` is an API configuration, not a measured hardware success.
+If discovery stays empty, verify both radios, foreground state, selected app's
+Local Network access, physical proximity and supported Apple Wi-Fi hardware;
+report each app's status. Do not disable a firewall or silently fall back to a
+router/hotspot and count that as success.
+
+A project-owned local Swift package in `native/nearby` is shared by iOS and a
+small Mac helper. The JVM bridge uses bounded JSON over private stdin/stdout;
+networking remains native. Wire messages are versioned, length-prefixed and
+bounded, with per-connection nonces, session/peer checks, explicit consent and
+unique ping acknowledgements. Names/IDs are self-reported. The fingerprint only
+correlates this request; **raw TCP is plaintext, without cryptographic device
+authentication**. This proximity POC is not a production secure channel and must
+not carry sensitive data. Apple selects the actual network path. Bonjour and
+usage declarations are included in iOS, Mac app and helper metadata; no global
+ATS bypass, multicast entitlement or Bluetooth implementation is added.
+
+Native checks:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test --package-path native/nearby
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./gradlew :desktopApp:test :shared:jvmTest :desktopApp:createDistributable
+```
+
+See Apple's [peer-to-peer networking guidance](https://developer.apple.com/documentation/network/nwparameters/includepeertopeer),
+[custom protocol sample](https://developer.apple.com/documentation/network/building-a-custom-peer-to-peer-protocol),
+[device discovery explanation](https://developer.apple.com/videos/play/wwdc2019/713/)
+and [local-network privacy guidance](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
+
 ### Play the first cross-device portal
 
 This local prototype supports one Mac and one iPhone on the **same trusted Wi-Fi**.
