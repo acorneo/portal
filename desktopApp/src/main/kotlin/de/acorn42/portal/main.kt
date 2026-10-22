@@ -23,7 +23,7 @@ import java.awt.event.WindowFocusListener
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "PORTAL — The First Maze",
+        title = "PORTAL — Into the Unknown",
         state = rememberWindowState(width = 1080.dp, height = 780.dp),
     ) {
         val input = remember { DesktopInput() }
@@ -31,6 +31,7 @@ fun main() = application {
         val clock = remember { FixedStepClock() }
         val focusRequester = remember { FocusRequester() }
         var sphere by remember { mutableStateOf(simulation.sphere) }
+        var visibility by remember { mutableStateOf(simulation.exploration.state) }
         var windowFocused by remember { mutableStateOf(window.isFocused) }
         var contentFocused by remember { mutableStateOf(false) }
         val active = windowFocused && contentFocused
@@ -70,6 +71,7 @@ fun main() = application {
                         previousFrame = now
                         clock.advance(elapsed) { simulation.step(input.movement(), it) }
                         sphere = simulation.sphere
+                        visibility = simulation.exploration.state
                     }
                 }
             }
@@ -78,6 +80,7 @@ fun main() = application {
         App(
             maze = simulation.maze,
             sphere = sphere,
+            visibility = visibility,
             controls = if (active) "WASD / Arrow keys to move · Explore the corridors" else "Click the maze to resume · WASD / Arrow keys to move",
             active = active,
             modifier = Modifier
