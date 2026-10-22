@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,12 +15,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.acorn42.portal.view.MazeCanvas
 import de.acorn42.portal.world.Maze
+import de.acorn42.portal.world.FirstMaze
 import de.acorn42.portal.world.Sphere
 import de.acorn42.portal.world.VisibilityState
+import de.acorn42.portal.world.WorldSimulation
 
 private val Background = Color(0xFF080F1B)
 private val Turquoise = Color(0xFF6FFFE2)
 private val Muted = Color(0xFF9AAEC4)
+
+/** Compatibility host for callers that display the default shared scene. */
+@Composable
+fun App() {
+    val simulation = remember { WorldSimulation(FirstMaze.world) }
+    App(simulation.maze, simulation.sphere, simulation.exploration.state)
+}
 
 /** Shared presentation only. The host owns simulation, frame timing, and input. */
 @Composable
