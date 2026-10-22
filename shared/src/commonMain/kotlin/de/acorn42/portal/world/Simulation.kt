@@ -8,15 +8,18 @@ class WorldSimulation(
 ) {
     var sphere: Sphere = initialSphere
         private set
+    val exploration: Exploration
 
     init {
         require(maze.canOccupy(initialSphere))
         require(movementSpeed.isFinite() && movementSpeed >= 0)
+        exploration = Exploration(maze, initialSphere.position)
     }
 
     fun step(input: MoveInput, seconds: Double) {
         require(seconds.isFinite() && seconds >= 0)
         sphere = maze.move(sphere, input.direction * (movementSpeed * seconds))
+        exploration.update(sphere.position)
     }
 }
 

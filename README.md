@@ -8,7 +8,7 @@
 **Game Mode:** Single-player, cross-device experience  
 **Working Title:** PORTAL
 
-### Run the first desktop maze
+### Run the desktop maze
 
 With a JDK installed, launch the native Compose application from the repository root:
 
@@ -18,21 +18,39 @@ With a JDK installed, launch the native Compose application from the repository 
 
 Move with **WASD or arrow keys**. Click the maze to restore keyboard focus.
 Switching windows pauses the simulation and clears held keys; press a direction
-again after returning. The entire handmade maze is visible in this milestone.
+again after returning. The camera follows the sphere smoothly; resizing keeps
+the view inside the world, or centers the world when it fits in the viewport.
+
+The sphere reveals a limited area with wall occlusion. Lit geometry is visible
+now; faint geometry has been explored before; unknown areas stay concealed.
+Exploration persists until the application closes. Walk away and return to
+check that remembered corridors remain faint while hidden paths stay dark.
+Resize the window and switch away while holding a direction to check camera
+bounds and focus behavior.
 
 ```sh
 ./gradlew :shared:jvmTest :desktopApp:test :desktopApp:compileKotlin
+./gradlew :shared:compileKotlinIosSimulatorArm64
 ```
 
 World models, the handmade map, movement, swept circle-wall collision, and the
-120 Hz fixed-step clock live in `shared/src/commonMain/.../world`, without
+120 Hz fixed-step clock live in `shared/src/commonMain/kotlin/de/acorn42/portal/world`, without
 Compose or platform input dependencies. World distances are measured in tiles;
 movement is 3 tiles per second, with normalized diagonal input. Catch-up is
 limited to 8 ticks per frame and excess stalled time is discarded. Continuous
 collision checks wall faces and rounded corners, then slides along contact
-surfaces. `App.kt` renders state using Compose Canvas; only `desktopApp` owns
-keyboard events, window focus, and the frame loop. The iOS entry point remains
-compatible and displays the shared maze without desktop controls.
+surfaces. Exploration advances with simulation steps, independently of the
+camera. Shared visibility uses circular, tile-centered sight with closed
+segment/wall intersection tests, including corner and thin-wall occlusion.
+Explored geometry is remembered; dynamic entities require an exact visible
+point within the radius and a clear sight line.
+
+`view/Camera.kt` contains pure camera bounds, transforms, and analytic smoothing
+for stationary or linearly moving targets. `view/MazeCanvas.kt` renders supplied
+world and visibility state at 64 dp per tile, with a soft radial light edge and
+modest sphere glow. Camera motion follows display frames; only `desktopApp`
+owns keyboard events, window focus, and simulation frame timing. The iOS entry
+point remains compatible and displays the shared scene without desktop controls.
 
 ---
 
