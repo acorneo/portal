@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-    <dict>
-        <key>NSMotionUsageDescription</key>
-        <string>PORTAL uses your phone’s tilt to roll the sphere in an offline puzzle room.</string>
-        <key>CADisableMinimumFrameDurationOnPhone</key>
-        <true/>
-    </dict>
+<dict>
+	<key>NSMotionUsageDescription</key>
+	<string>PORTAL uses your phone’s tilt to roll the sphere in its pocket puzzle room.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PORTAL discovers your nearby Mac over peer-to-peer Wi-Fi to play together without a shared router.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_portalnear._tcp</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+</dict>
 </plist>

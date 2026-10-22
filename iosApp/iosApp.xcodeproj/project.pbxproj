@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+        A04200000000000000000001 /* NearbyCore in Frameworks */ = {isa = PBXBuildFile; productRef = A04200000000000000000002 /* NearbyCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		D71CA6953F902F236E6C8895 /* portal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = portal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -41,6 +45,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                A04200000000000000000001 /* NearbyCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +90,7 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
+                A04200000000000000000002 /* NearbyCore */,
 			);
 			productName = iosApp;
 			productReference = D71CA6953F902F236E6C8895 /* portal.app */;
@@ -115,6 +121,7 @@
 			mainGroup = AAC9C95D1FBE1DC40A21265F;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+            packageReferences = (A04200000000000000000003 /* PortalNearby */);
 			productRefGroup = CCF228B626CFE0E1239463B3 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -165,6 +172,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin XCLocalSwiftPackageReference section */
+        A04200000000000000000003 /* PortalNearby */ = {isa = XCLocalSwiftPackageReference; relativePath = ../native/nearby; };
+/* End XCLocalSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+        A04200000000000000000002 /* NearbyCore */ = {isa = XCSwiftPackageProductDependency; productName = NearbyCore; };
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		0CF1CD0FD1BDC9C450529B22 /* Debug */ = {

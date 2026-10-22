@@ -5,6 +5,7 @@ class WorldSimulation(
     val maze: Maze,
     initialSphere: Sphere = Sphere(maze.start),
     val movementSpeed: Double = 3.0,
+    initialExplored: Set<Cell> = emptySet(),
 ) {
     var sphere: Sphere = initialSphere
         private set
@@ -13,7 +14,7 @@ class WorldSimulation(
     init {
         require(maze.canOccupy(initialSphere))
         require(movementSpeed.isFinite() && movementSpeed >= 0)
-        exploration = Exploration(maze, initialSphere.position)
+        exploration = Exploration(maze, initialSphere.position, initialExplored = initialExplored)
     }
 
     fun step(input: MoveInput, seconds: Double) {

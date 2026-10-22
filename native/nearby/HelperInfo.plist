@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>de.acorn42.portal.nearby-helper</string>
+<key>CFBundleName</key><string>PORTAL Nearby Helper</string>
+<key>NSLocalNetworkUsageDescription</key><string>PORTAL discovers and connects to a nearby iPhone using peer-to-peer Wi-Fi to play PORTAL together.</string>
+<key>NSBonjourServices</key><array><string>_portalnear._tcp</string></array>
+</dict></plist>

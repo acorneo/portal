@@ -142,6 +142,13 @@ internal class PhoneHost {
         else message = "Room reset · drag from the pad’s center"
     }
 
+    fun restore(checkpoint: PhoneState) {
+        pause()
+        puzzle.restore(checkpoint.copy(velocity = Vec2.Zero))
+        state = puzzle.state
+        lastImpact = -1.0
+    }
+
     fun frame(elapsed: Double) {
         if (!active || state.completed) return
         if (!touchMode && !failed && now() - (if (hasSample) sampleAt else startedAt) > 1.0) {
@@ -153,7 +160,7 @@ internal class PhoneHost {
             val events = puzzle.step(input, seconds)
             if (events.exited) {
                 stopInput()
-                message = "Exit reached · offline room complete"
+                message = "Exit reached · returning to your Mac"
                 success.notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
             } else if (events.impactSpeed > 0.35 && now() - lastImpact > 0.12) {
                 impact.impactOccurred()
@@ -165,13 +172,13 @@ internal class PhoneHost {
 }
 
 @Composable
-internal fun rememberPhoneHost(): PhoneHost {
+internal fun rememberPhoneHost(enabled: Boolean = true): PhoneHost {
     val host = remember { PhoneHost() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(host, lifecycle) {
+    DisposableEffect(host, lifecycle, enabled) {
         val screen = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> host.start()
+                Lifecycle.Event.ON_RESUME -> if (enabled) host.start() else host.pause()
                 Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_DESTROY -> host.pause()
                 else -> Unit
             }
@@ -181,9 +188,10 @@ internal fun rememberPhoneHost(): PhoneHost {
         val inactive = center.addObserverForName(UIApplicationWillResignActiveNotification, null, NSOperationQueue.mainQueue) { host.pause() }
         val background = center.addObserverForName(UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue) { host.pause() }
         val foreground = center.addObserverForName(UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue) {
-            if (lifecycle.currentState == Lifecycle.State.RESUMED) host.start()
+            if (enabled && lifecycle.currentState == Lifecycle.State.RESUMED) host.start()
         }
-        if (lifecycle.currentState == Lifecycle.State.RESUMED && UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive) host.start()
+        if (enabled && lifecycle.currentState == Lifecycle.State.RESUMED && UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive) host.start()
+        else host.pause()
         onDispose {
             lifecycle.removeObserver(screen)
             center.removeObserver(inactive)
