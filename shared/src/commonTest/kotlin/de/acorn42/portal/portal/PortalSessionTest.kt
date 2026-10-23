@@ -13,7 +13,7 @@ class PortalSessionTest {
     private fun hello() = ClientPacket(ClientKind.Hello, clientId = "phone", pairCode = "123456")
     private fun command(host: PortalSession, kind: ClientKind) = ClientPacket(
         kind, sessionId = "session", clientId = "phone", generation = host.snapshot.generation,
-        transferId = host.snapshot.transferId.orEmpty(),
+        runId = host.snapshot.runId, transferId = host.snapshot.transferId.orEmpty(),
     )
     private fun phone(host: PortalSession) {
         assertEquals(ServerKind.Welcome, host.hello(hello(), 1).kind)
@@ -22,6 +22,12 @@ class PortalSessionTest {
         assertEquals(TransferPhase.Phone, host.snapshot.phase)
     }
     private fun completed() = PhoneCheckpoint(PhoneRoom.exit.x, PhoneRoom.exit.y, completed = true)
+
+    private fun completed(roomVariant: Int) = PhoneCheckpoint.initial(roomVariant).copy(
+        x = PhoneRoom.exitFor(roomVariant).x,
+        y = PhoneRoom.exitFor(roomVariant).y,
+        completed = true,
+    )
 
     @Test fun protocolRoundTripsAndRejectsMalformedOversizeFrames() {
         val packet = hello()
@@ -84,6 +90,87 @@ class PortalSessionTest {
         repeat(4) { host.receive(ack); host.receive(completion) }
         assertEquals(returned, host.snapshot)
         assertFalse(host.enterPortal())
+    }
+
+    @Test fun authoredChapterAdvancesThroughTwoPhoneVariantsAndCompletesOnMac() {
+        val host = host()
+        host.hello(hello(), 1)
+
+        assertTrue(host.enterPortal())
+        host.receive(command(host, ClientKind.Acknowledge))
+        assertEquals(1, host.snapshot.phoneRoom)
+        host.receive(command(host, ClientKind.Progress).copy(
+            runId = host.snapshot.runId,
+            sequence = 1,
+            phone = completed(1),
+        ))
+        host.receive(command(host, ClientKind.Acknowledge).copy(transferId = host.snapshot.returnId!!))
+        assertEquals(ChapterObjective.ReachGreenExit, host.snapshot.objective)
+        assertTrue(host.snapshot.gateUnlocked)
+        assertFalse(host.snapshot.completed)
+
+        assertTrue(host.desktopCheckpoint(DesktopCheckpoint.from(1, PortalLevel.exit)))
+        assertEquals(2, host.snapshot.chapter)
+        assertEquals(2, host.snapshot.desktopRoom)
+        assertEquals(ChapterObjective.RollSecondPocketRoom, host.snapshot.objective)
+        assertTrue(host.enterPortal())
+        host.receive(command(host, ClientKind.Acknowledge))
+        assertEquals(2, host.snapshot.phoneRoom)
+        assertEquals(PhoneRoom.secondMaze.start, Vec2(host.snapshot.phone.x, host.snapshot.phone.y))
+
+        host.receive(command(host, ClientKind.Progress).copy(
+            runId = host.snapshot.runId,
+            sequence = 1,
+            phone = completed(2),
+        ))
+        host.receive(command(host, ClientKind.Acknowledge).copy(transferId = host.snapshot.returnId!!))
+        assertTrue(host.snapshot.completed)
+        assertEquals(ChapterObjective.Complete, host.snapshot.objective)
+        assertEquals(ActiveDevice.Desktop, host.snapshot.owner)
+        assertFalse(host.enterPortal())
+    }
+
+    @Test fun newChapterKeepsPairingButRejectsProgressFromTheOldRun() {
+        val host = host()
+        host.hello(hello(), 1)
+        host.enterPortal()
+        host.receive(command(host, ClientKind.Acknowledge))
+        val stale = command(host, ClientKind.Progress).copy(
+            runId = host.snapshot.runId,
+            sequence = 1,
+            phone = PhoneCheckpoint(2.5, 2.0),
+        )
+        val oldRun = host.snapshot.runId
+        val reset = host.newChapter()
+        assertNotEquals(oldRun, reset.runId)
+        assertEquals("phone", reset.clientId)
+        assertTrue(reset.connected)
+        assertEquals(ChapterObjective.ExploreFirstRoom, reset.objective)
+        assertEquals(1, reset.desktopRoom)
+        assertEquals(ServerKind.Error, host.receive(stale).kind)
+        assertEquals(ChapterObjective.ExploreFirstRoom, host.snapshot.objective)
+        assertFalse(host.snapshot.completed)
+    }
+
+    @Test fun desktopCheckpointSurvivesReconnectWithoutChangingRoomOwnership() {
+        val host = host()
+        host.hello(hello(), 1)
+        val checkpoint = DesktopCheckpoint.from(1, Vec2(2.5, 1.5))
+        assertTrue(host.desktopCheckpoint(checkpoint))
+        assertEquals(checkpoint, host.snapshot.desktop)
+        val generation = host.snapshot.generation
+        host.disconnect(generation)
+        assertFalse(host.snapshot.connected)
+        assertEquals(checkpoint, host.snapshot.desktop)
+
+        val resumed = host.hello(
+            hello().copy(sessionId = "session", resumeToken = "secret-resume"),
+            2,
+        )
+        assertEquals(ServerKind.Welcome, resumed.kind)
+        assertEquals(checkpoint, host.snapshot.desktop)
+        assertEquals(TransferPhase.Desktop, host.snapshot.phase)
+        assertEquals(ActiveDevice.Desktop, host.snapshot.owner)
     }
 
     @Test fun staleAndWrongSessionInputsNeverChangeOwnershipOrProgress() {

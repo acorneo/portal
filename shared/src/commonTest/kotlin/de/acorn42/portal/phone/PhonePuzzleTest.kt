@@ -1,5 +1,6 @@
 package de.acorn42.portal.phone
 
+import de.acorn42.portal.portal.PhoneCheckpoint
 import de.acorn42.portal.world.*
 import kotlin.test.*
 
@@ -89,6 +90,20 @@ class PhonePuzzleTest {
         assertEquals(final, puzzle.state)
         puzzle.reset()
         assertFalse(puzzle.state.completed)
+    }
+
+    @Test fun secondAuthoredPhoneVariantHasDistinctValidGeometryAndCheckpoint() {
+        val first = PhonePuzzle()
+        val second = PhonePuzzle(PhoneRoom.secondMaze, PhoneRoom.secondExit)
+        assertEquals(PhoneRoom.maze.width, second.maze.width)
+        assertNotEquals(PhoneRoom.maze.walls, second.maze.walls)
+        assertTrue(second.maze.canOccupy(Sphere(second.maze.start)))
+        val checkpoint = PhoneCheckpoint.initial(2)
+        assertEquals(2, checkpoint.roomVariant)
+        assertTrue(checkpoint.valid())
+        assertEquals(PhoneRoom.secondMaze.start, checkpoint.toState().sphere.position)
+        assertNotEquals(first.maze.walls, second.maze.walls)
+        assertFalse(checkpoint.copy(roomVariant = 3).valid())
     }
 
     @Test fun fixedClockProducesSamePhysicsAcrossFrameRatesAndDropsPauseBacklog() {

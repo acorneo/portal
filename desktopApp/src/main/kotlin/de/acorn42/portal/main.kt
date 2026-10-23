@@ -43,6 +43,9 @@ fun main() = application {
         var sphere by remember { mutableStateOf(simulation.sphere) }
         var visibility by remember { mutableStateOf(simulation.exploration.state) }
         var appliedReturn by remember { mutableStateOf<String?>(null) }
+        var appliedRun by remember { mutableStateOf(session.runId) }
+        var appliedRoom by remember { mutableIntStateOf(1) }
+        var checkpointFrame by remember { mutableIntStateOf(0) }
         val clock = remember { FixedStepClock() }
         val focusRequester = remember { FocusRequester() }
         var focused by remember { mutableStateOf(window.isFocused) }
@@ -82,10 +85,30 @@ fun main() = application {
         }
         LaunchedEffect(availability.hostAvailable) { host.hostAvailable(availability.hostAvailable) }
         LaunchedEffect(focused) { if (focused) focusRequester.requestFocus() }
-        LaunchedEffect(session.gateUnlocked, session.returnId) {
-            if (session.gateUnlocked && session.returnId != appliedReturn) {
+        LaunchedEffect(session.gateUnlocked, session.returnId, session.phoneRoom) {
+            if (session.gateUnlocked && session.phoneRoom == 1 && session.returnId != appliedReturn) {
                 simulation = WorldSimulation(PortalLevel.openMaze, Sphere(PortalLevel.exit), initialExplored = visibility.exploredCells)
                 sphere = simulation.sphere; visibility = simulation.exploration.state; appliedReturn = session.returnId
+            }
+        }
+        LaunchedEffect(session.runId, session.desktopRoom, session.desktop, session.chapter) {
+            if (session.runId != appliedRun || session.desktopRoom != appliedRoom) {
+                simulation = WorldSimulation(
+                    PortalLevel.room(session.desktopRoom).maze,
+                    Sphere(session.desktop.position()),
+                )
+                sphere = simulation.sphere
+                visibility = simulation.exploration.state
+                appliedRun = session.runId
+                appliedRoom = session.desktopRoom
+                appliedReturn = null
+            } else if (!active && session.phase == TransferPhase.Desktop && session.desktopRoom == 1 &&
+                session.desktop.position() != sphere.position
+            ) {
+                val restoredMaze = if (session.gateUnlocked) PortalLevel.openMaze else PortalLevel.closedMaze
+                simulation = WorldSimulation(restoredMaze, Sphere(session.desktop.position()), initialExplored = visibility.exploredCells)
+                sphere = simulation.sphere
+                visibility = simulation.exploration.state
             }
         }
         LaunchedEffect(active, simulation) {
@@ -95,7 +118,13 @@ fun main() = application {
                 while (true) withFrameNanos { now ->
                     clock.advance((now - previous).coerceAtLeast(0L) / 1e9) { simulation.step(input.movement(), it) }
                     previous = now; sphere = simulation.sphere; visibility = simulation.exploration.state
-                    if (currentSession.ready && currentSession.phase == TransferPhase.Desktop && !currentSession.gateUnlocked && PortalLevel.atEntrance(sphere.position)) host.enterPortal()
+                    if (++checkpointFrame % 6 == 0 && currentSession.phase == TransferPhase.Desktop) {
+                        host.desktopCheckpoint(DesktopCheckpoint.from(currentSession.desktopRoom, sphere.position))
+                    }
+                    if (currentSession.ready && currentSession.phase == TransferPhase.Desktop && !currentSession.completed &&
+                        currentSession.objective in setOf(ChapterObjective.ExploreFirstRoom, ChapterObjective.RollSecondPocketRoom) &&
+                        PortalLevel.atPhonePortal(currentSession.desktopRoom, sphere.position)
+                    ) host.enterPortal()
                 }
             }
         }
@@ -107,6 +136,7 @@ fun main() = application {
                         Text(connectionMessage.ifBlank { nearby.message }, color = Color(0xFF9AAEC4), fontSize = 11.sp)
                         if (nearby.phase == "awaitingApproval") Text("Compare on iPhone: ${nearby.fingerprint}", color = Color(0xFFBD91FF), fontSize = 12.sp)
                     }
+                    TextButton(onClick = { host.newChapter(); simulation = WorldSimulation(PortalLevel.closedMaze); sphere = simulation.sphere; visibility = simulation.exploration.state; appliedRun = ""; appliedRoom = 1; focusRequester.requestFocus() }) { Text("New chapter") }
                     if (nearby.phase == "awaitingApproval") {
                         Button(onClick = { host.bridge.command("accept", nearby.requestID); focusRequester.requestFocus() }) { Text("Accept iPhone") }
                         TextButton(onClick = { host.bridge.command("reject", nearby.requestID); focusRequester.requestFocus() }) { Text("Reject") }
@@ -118,14 +148,20 @@ fun main() = application {
                 }
                 App(simulation.maze, sphere, visibility,
                     controls = when {
-                        session.gateUnlocked -> "Gate open · Sphere returned · WASD / Arrow keys to explore"
+                        session.completed -> "Chapter complete · New chapter starts a fresh run"
+                        session.objective == ChapterObjective.ReachGreenExit -> "Gate open · reach the green exit to advance to room two"
+                        session.objective == ChapterObjective.RollSecondPocketRoom -> "Room two · enter the violet portal to send the sphere to your iPhone"
+                        session.gateUnlocked -> "Gate open · cross the amber gate · WASD / Arrow keys to explore"
                         session.clientId != null && !session.ready -> "Paused · reconnect the same iPhone to resume"
                         session.phase == TransferPhase.Phone -> "Continue on your iPhone · roll to its violet exit"
                         session.phase == TransferPhase.OutboundPending -> "Sending sphere to your iPhone…"
                         session.phase == TransferPhase.ReturnPending -> "Returning sphere to the maze…"
-                        session.ready -> "WASD / Arrows · enter the violet ring to travel to your iPhone"
+                        session.ready && session.desktopRoom == 1 -> "WASD / Arrows · enter the violet ring for your iPhone; return and reach green to advance"
+                        session.ready -> "WASD / Arrows · enter the violet ring to send the sphere to your iPhone"
                         else -> "Choose this Mac on your iPhone, then accept its nearby connection"
-                    }, active = active, sphereVisible = session.owner == ActiveDevice.Desktop, portals = true, gateUnlocked = session.gateUnlocked,
+                    }, chapterLabel = "${session.chapter.toString().padStart(2, '0')} / ${PortalLevel.room(session.desktopRoom).title.uppercase()}",
+                    active = active, sphereVisible = session.owner == ActiveDevice.Desktop, portals = true,
+                    gateUnlocked = session.gateUnlocked, portalRoomId = session.desktopRoom,
                     modifier = Modifier.weight(1f).focusRequester(focusRequester).onFocusChanged {
                         contentFocused = it.hasFocus; if (!it.hasFocus) input.clear()
                     }.onPreviewKeyEvent { if (availability.keyboardAvailable && session.desktopCanMove) input.handle(it) else false }
