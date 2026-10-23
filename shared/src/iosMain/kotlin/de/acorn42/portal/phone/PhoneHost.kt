@@ -14,7 +14,10 @@ import platform.UIKit.*
 
 /** Main-thread-only owner. Motion callbacks, Compose frames and lifecycle share the main queue. */
 internal class PhoneHost {
-    val puzzle = PhonePuzzle()
+    var roomVariant by mutableStateOf(1)
+        private set
+    var puzzle = PhonePuzzle()
+        private set
     val clock = FixedStepClock()
     private val calibration = TiltCalibration()
     private val motion = CMMotionManager()
@@ -140,6 +143,22 @@ internal class PhoneHost {
         if (!touchMode && failed) message = "Motion unavailable · choose touch fallback"
         else if (!touchMode) message = "Room reset · hold flatter and calibrate"
         else message = "Room reset · drag from the pad’s center"
+    }
+
+    fun loadRoom(variant: Int) {
+        require(variant in 1..2)
+        if (roomVariant == variant) return
+        val wasActive = active
+        pause()
+        roomVariant = variant
+        puzzle = PhonePuzzle(
+            maze = PhoneRoom.mazeFor(variant),
+            exit = PhoneRoom.exitFor(variant),
+        )
+        state = puzzle.state
+        failed = false
+        touchMode = !motion.deviceMotionAvailable
+        if (wasActive) start()
     }
 
     fun restore(checkpoint: PhoneState) {

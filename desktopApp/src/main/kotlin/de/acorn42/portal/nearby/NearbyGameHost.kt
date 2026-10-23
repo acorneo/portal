@@ -49,6 +49,11 @@ internal class NearbyGameHost(scope: CoroutineScope) : AutoCloseable {
     private fun broadcast() { if (connection.isNotEmpty()) bridge.sendGame(connection, PortalCodec.encode(authority.state())) }
     fun hostAvailable(value: Boolean) { authority.hostAvailable(value); publish(); broadcast() }
     fun enterPortal() { if (authority.enterPortal()) { publish(); broadcast() } }
+    fun desktopCheckpoint(checkpoint: DesktopCheckpoint) {
+        if (authority.desktopCheckpoint(checkpoint)) { publish(); broadcast() }
+    }
+    fun newChapter() { authority.newChapter(); publish(); broadcast() }
+    fun snapshot() = authority.snapshot
     override fun close() { reader.cancel(); ticker.cancel(); bridge.close() }
 }
 

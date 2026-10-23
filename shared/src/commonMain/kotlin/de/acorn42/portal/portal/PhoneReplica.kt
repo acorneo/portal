@@ -56,7 +56,7 @@ class PhoneReplica(val clientId: String) {
         val state = snapshot ?: return emptyList()
         fun packet(kind: ClientKind) = ClientPacket(
             kind, sessionId = state.sessionId, clientId = clientId,
-            generation = state.generation, foreground = foreground,
+            generation = state.generation, runId = state.runId, foreground = foreground,
         )
         return buildList {
             add(packet(ClientKind.Foreground))

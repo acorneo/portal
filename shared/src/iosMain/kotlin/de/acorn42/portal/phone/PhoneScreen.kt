@@ -37,14 +37,14 @@ internal fun PhonePuzzleScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("P O R T A L", color = Mint, fontSize = 24.sp, fontWeight = FontWeight.Light)
-                    Text("01 / THE POCKET ROOM", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
+                    Text("${if (host.roomVariant == 1) "01" else "02"} / THE POCKET ROOM", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(label, color = Muted, fontSize = 10.sp)
                 }
             }
             Spacer(Modifier.height(12.dp))
-            RoomCanvas(host.state, Modifier.fillMaxWidth().weight(1f))
+            RoomCanvas(host, Modifier.fillMaxWidth().weight(1f))
             Spacer(Modifier.height(12.dp))
             Text(if (host.state.completed) "EXIT REACHED" else if (!host.active) "PAUSED" else if (host.ready) "ROLL TO THE VIOLET EXIT" else "SET YOUR NEUTRAL", color = Mint, fontSize = 12.sp)
             Text(host.message, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
@@ -94,9 +94,10 @@ private fun TouchPad(host: PhoneHost, modifier: Modifier) {
 }
 
 @Composable
-private fun RoomCanvas(state: PhoneState, modifier: Modifier) {
+private fun RoomCanvas(host: PhoneHost, modifier: Modifier) {
+    val state = host.state
     Canvas(modifier.semantics { contentDescription = "Handmade room with two alternating wall gaps, glowing sphere and violet exit" }) {
-        val room = PhoneRoom.maze
+        val room = host.puzzle.maze
         val scale = minOf(size.width / room.width, size.height / room.height)
         val origin = Offset((size.width - room.width * scale) / 2, (size.height - room.height * scale) / 2)
         translate(origin.x, origin.y) {
@@ -109,7 +110,8 @@ private fun RoomCanvas(state: PhoneState, modifier: Modifier) {
                 drawRect(Color(0xFF304A62), offset, extent)
                 drawLine(Color(0xFF567792), offset, offset + Offset(extent.width, 0f), 1f)
             }
-            val exit = Offset(PhoneRoom.exit.x.toFloat() * scale, PhoneRoom.exit.y.toFloat() * scale)
+            val exitPoint = if (host.roomVariant == 2) PhoneRoom.secondExit else PhoneRoom.exit
+            val exit = Offset(exitPoint.x.toFloat() * scale, exitPoint.y.toFloat() * scale)
             val violet = if (state.completed) Mint else Color(0xFFB89AFF)
             drawCircle(violet.copy(alpha = 0.15f), scale * 0.9f, exit)
             drawCircle(violet, PhoneRoom.exitRadius.toFloat() * scale, exit, style = Stroke(2.dp.toPx()))

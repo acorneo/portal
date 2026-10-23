@@ -55,6 +55,8 @@ class NearbyPortalAuthority(
         }
     }
     fun enterPortal() = session.enterPortal()
+    fun newChapter() = session.newChapter()
+    fun desktopCheckpoint(checkpoint: DesktopCheckpoint) = session.desktopCheckpoint(checkpoint)
     fun hostAvailable(value: Boolean) = session.hostForeground(value)
     fun state() = session.state()
 }

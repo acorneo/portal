@@ -33,7 +33,17 @@ private data class CellGeometry(val cell: Cell, val walls: List<Wall>)
 
 /** Camera and light effects are presentation state. Exploration is read-only here. */
 @Composable
-internal fun MazeCanvas(maze: Maze, sphere: Sphere, visibility: VisibilityState, active: Boolean, modifier: Modifier, sphereVisible: Boolean = true, portals: Boolean = false, gateUnlocked: Boolean = false) {
+internal fun MazeCanvas(
+    maze: Maze,
+    sphere: Sphere,
+    visibility: VisibilityState,
+    active: Boolean,
+    modifier: Modifier,
+    sphereVisible: Boolean = true,
+    portals: Boolean = false,
+    gateUnlocked: Boolean = false,
+    portalRoomId: Int = 1,
+) {
     val pixelsPerTile = with(LocalDensity.current) { 64.dp.toPx().toDouble() }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val viewport = if (canvasSize.width > 0 && canvasSize.height > 0) {
@@ -116,7 +126,12 @@ internal fun MazeCanvas(maze: Maze, sphere: Sphere, visibility: VisibilityState,
             }
 
             if (portals) {
-                for ((point, tint) in listOf(PortalLevel.entrance to Color(0xFFBD91FF), PortalLevel.exit to Turquoise)) {
+                val room = PortalLevel.room(portalRoomId)
+                val markers = buildList {
+                    add(room.phonePortal to Color(0xFFBD91FF))
+                    room.chapterExit?.let { add(it to Turquoise) }
+                }
+                for ((point, tint) in markers) {
                     val known = visibility.at(Cell(floor(point.x).toInt(), floor(point.y).toInt()))
                     if (known == Visibility.Unexplored) continue
                     val alpha = if (known == Visibility.Visible) 1f else 0.22f

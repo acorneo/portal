@@ -45,6 +45,17 @@ object PhoneRoom {
     ), Vec2(1.5, 2.0))
     val exit = Vec2(7.3, 11.0)
     const val exitRadius = 0.65
+
+    /** A deterministic, authored second pocket room; its layout never depends on device state. */
+    val secondMaze = Maze(9, 13, listOf(
+        Wall(0.0, 0.0, 9.0, 0.5), Wall(0.0, 12.5, 9.0, 13.0),
+        Wall(0.0, 0.5, 0.5, 12.5), Wall(8.5, 0.5, 9.0, 12.5),
+        Wall(0.5, 4.0, 4.5, 4.5), Wall(6.5, 4.0, 8.5, 4.5),
+        Wall(0.5, 8.0, 2.5, 8.5), Wall(4.5, 8.0, 8.5, 8.5),
+    ), Vec2(1.5, 2.0))
+    val secondExit = Vec2(7.3, 11.0)
+    fun mazeFor(variant: Int) = if (variant == 2) secondMaze else maze
+    fun exitFor(variant: Int) = if (variant == 2) secondExit else exit
 }
 
 data class PhoneState(val sphere: Sphere, val velocity: Vec2 = Vec2.Zero, val completed: Boolean = false)
@@ -53,7 +64,7 @@ data class PhoneEvents(val impactSpeed: Double = 0.0, val exited: Boolean = fals
 /** Offline room physics. The host supplies fixed ticks and owns all native effects. */
 class PhonePuzzle(
     val maze: Maze = PhoneRoom.maze,
-    val exit: Vec2 = PhoneRoom.exit,
+    val exit: Vec2 = if (maze === PhoneRoom.secondMaze) PhoneRoom.secondExit else PhoneRoom.exit,
     initialSphere: Sphere = Sphere(maze.start),
 ) {
     private val initial = initialSphere
